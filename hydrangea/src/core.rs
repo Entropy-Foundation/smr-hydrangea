@@ -4,14 +4,14 @@ use crate::error::{ConsensusError, ConsensusResult};
 use crate::leader::LeaderElector;
 use crate::mempool::MempoolDriver;
 use crate::messages::{
-    Block, FallbackRecoveryProposal, NormalProposal, ProposalType, Timeout, Vote, VoteType, QC, TC,
+    Block, FallbackRecoveryProposal, NormalProposal, Timeout, Vote, VoteType, QC, TC,
     WQC,
 };
 use crate::proposer::{ProposalTrigger, ProposerMessage};
 use crate::synchronizer::Synchronizer;
 use crate::timer::Timer;
 use async_recursion::async_recursion;
-use blsttc::{PublicKeyShareG2, SignatureShareG1};
+use blsttc::SignatureShareG1;
 use bytes::Bytes;
 use config::Committee;
 use crypto::{BlsSignatureService, Digest, Hash as _};
@@ -21,7 +21,6 @@ use network::SimpleSender;
 use primary::Certificate;
 use std::cmp::max;
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 use store::Store;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::Instant;

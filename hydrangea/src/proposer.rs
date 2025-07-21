@@ -2,7 +2,6 @@ use crate::consensus::{ConsensusMessage, ProposalMessage, Round};
 use crate::messages::{Block, FallbackRecoveryProposal, NormalProposal, QC, TC};
 use bytes::Bytes;
 use config::Committee;
-use crypto::Hash;
 use crypto::{PublicKey, SignatureService};
 use log::{debug, info};
 use network::{CancelHandler, ReliableSender};

@@ -1,15 +1,13 @@
 use crate::consensus::Round;
 use crate::error::ConsensusResult;
-use crate::messages::{Timeout, Vote, VoteType, QC, TC, WQC};
+use crate::messages::{Timeout, Vote, QC, TC, WQC};
 use blsttc::{PublicKeyShareG2, SignatureShareG1};
 use config::{Committee, Stake};
 use crypto::{
     aggregate_sign, combine_key_from_ids, remove_pubkeys, Digest, Hash, PublicKey, Signature,
 };
-use log::{debug, info};
+use log::info;
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
-use std::time::Instant;
 
 // #[cfg(test)]
 // #[path = "tests/aggregator_tests.rs"]
@@ -155,7 +153,7 @@ impl QCMaker {
                     }
                     let agg_pk =
                         remove_pubkeys(&committee.combined_pubkey, ids, &committee.sorted_keys);
-                    // SignatureShareG1::verify_batch(&vote.digest().0, &agg_pk, &self.agg_sign)?;
+                    SignatureShareG1::verify_batch(&vote.digest().0, &agg_pk, &self.agg_sign)?;
 
                     info!("Constructed {} QC. Votes: {} ", vote.kind, self.votes.len(),);
 
