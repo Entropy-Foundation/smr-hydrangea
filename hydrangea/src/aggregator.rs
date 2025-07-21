@@ -1,9 +1,11 @@
 use crate::consensus::Round;
 use crate::error::ConsensusResult;
-use crate::messages::{Timeout, Vote, VoteType, QC, TC};
+use crate::messages::{Timeout, Vote, VoteType, QC, TC, WQC};
 use blsttc::{PublicKeyShareG2, SignatureShareG1};
 use config::{Committee, Stake};
-use crypto::{aggregate_sign, remove_pubkeys, Digest, Hash, PublicKey, Signature};
+use crypto::{
+    aggregate_sign, combine_key_from_ids, remove_pubkeys, Digest, Hash, PublicKey, Signature,
+};
 use log::{debug, info};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -153,7 +155,7 @@ impl QCMaker {
                     }
                     let agg_pk =
                         remove_pubkeys(&committee.combined_pubkey, ids, &committee.sorted_keys);
-                    SignatureShareG1::verify_batch(&vote.digest().0, &agg_pk, &self.agg_sign)?;
+                    // SignatureShareG1::verify_batch(&vote.digest().0, &agg_pk, &self.agg_sign)?;
 
                     info!("Constructed {} QC. Votes: {} ", vote.kind, self.votes.len(),);
 
@@ -204,8 +206,10 @@ impl QCMaker {
 
 struct TCMaker {
     high_qc: QC,
+    high_wqc: WQC,
     used: HashSet<PublicKey>,
     votes: Vec<(PublicKey, Signature, Round)>,
+    high_votes: Vec<Vote>,
     weight: Stake,
 }
 
@@ -213,10 +217,65 @@ impl TCMaker {
     pub fn new() -> Self {
         Self {
             high_qc: QC::genesis(),
+            high_wqc: WQC::genesis(),
             used: HashSet::new(),
             votes: Vec::new(),
+            high_votes: Vec::new(),
             weight: 0,
         }
+    }
+
+    fn check_wqc(&mut self, committee: &Committee) -> Option<WQC> {
+        let weak_cert_threshold = (committee.f + committee.p + 1) as usize;
+        let mut freq_map = HashMap::new();
+        for hv in &self.high_votes {
+            freq_map
+                .entry(hv.round)
+                .or_insert_with(Vec::new)
+                .push(hv.clone());
+        }
+
+        if let Some(votes) = freq_map
+            .into_iter()
+            .find(|(_, votes)| votes.len() >= weak_cert_threshold)
+            .map(|(_, votes)| votes)
+        {
+            let first_vote = votes[0].clone();
+            let mut agg_sign = first_vote.signature.clone();
+            let blk_hash = first_vote.blk_hash;
+            let round = first_vote.round;
+            let mut pk_bit_vec: Vec<u128> = vec![u128::MAX; (committee.n as usize + 127) / 128];
+            let mut id;
+            let mut author_bls_g2;
+
+            let mut first = true;
+            let mut ids = Vec::new();
+            for vote in &votes {
+                author_bls_g2 = committee.get_bls_public_g2(&vote.author);
+                id = committee.sorted_keys.binary_search(&author_bls_g2).unwrap();
+                let chunk = id / 128;
+                let bit = id % 128;
+                pk_bit_vec[chunk] &= !(1 << bit);
+                ids.push(id);
+                if first {
+                    first = false;
+                } else {
+                    let new_agg_sign = aggregate_sign(&agg_sign, &vote.signature);
+                    agg_sign = new_agg_sign;
+                }
+            }
+
+            let agg_pk = combine_key_from_ids(ids, &committee.sorted_keys);
+            SignatureShareG1::verify_batch(&votes.last().unwrap().digest().0, &agg_pk, &agg_sign)
+                .ok()?;
+
+            return Some(WQC {
+                blk_hash: blk_hash,
+                round: round,
+                votes: (pk_bit_vec, agg_sign),
+            });
+        }
+        None
     }
 
     /// Try to append a signature to a (partial) quorum.
@@ -240,6 +299,7 @@ impl TCMaker {
             // Add the timeout to the accumulator.
             self.votes
                 .push((author, timeout.signature, timeout.high_qc.round));
+            self.high_votes.push(timeout.high_vote);
             self.weight += committee.stake(&author);
 
             // Update high QC.
@@ -247,15 +307,27 @@ impl TCMaker {
                 self.high_qc = timeout.high_qc;
             }
 
+            if timeout.high_wqc.round > self.high_wqc.round {
+                self.high_wqc = timeout.high_wqc;
+            }
+
             if self.weight >= committee.quorum_threshold() {
                 // We do not reset the weight after creating the TC because we might
                 // still need to send Timeout messages for this round to our honest
                 // peers in case they either were censored by the Byzantine nodes or
                 // the network dropped some of the honest Timeouts en-route to them.
+
+                if let Some(wqc) = self.check_wqc(committee) {
+                    if wqc.round > self.high_wqc.round {
+                        self.high_wqc = wqc;
+                    }
+                }
+
                 return Ok((
                     self.weight,
                     Some(TC {
                         high_qc: self.high_qc.clone(),
+                        high_wqc: self.high_wqc.clone(),
                         round: timeout.round,
                         votes: self.votes.clone(),
                     }),

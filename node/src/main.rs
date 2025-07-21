@@ -7,7 +7,6 @@ use config::{BlsKeyPair, Comm, Committee, KeyPair, Parameters};
 use crypto::{BlsSignatureService, SignatureService};
 use env_logger::Env;
 use hydrangea::{Block, Consensus};
-use log::debug;
 use primary::Primary;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver};

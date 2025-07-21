@@ -11,7 +11,7 @@ use crate::proposer::{ProposalTrigger, ProposerMessage};
 use crate::synchronizer::Synchronizer;
 use crate::timer::Timer;
 use async_recursion::async_recursion;
-use blsttc::PublicKeyShareG2;
+use blsttc::{PublicKeyShareG2, SignatureShareG1};
 use bytes::Bytes;
 use config::Committee;
 use crypto::{BlsSignatureService, Digest, Hash as _};
@@ -41,12 +41,13 @@ pub struct Core {
     committable_blocks: HashMap<Digest, Round>,
     consensus_only: bool,
     last_commit: Block,
-    last_vote: (Round, Block),
+    last_vote: Vote,
     // t_l
     last_timeout: Round,
     leader_elector: LeaderElector,
     // qc_l
     locked: QC,
+    high_wqc: WQC,
     // Highest weak certificate
     // hwqc: WQC,
     mempool_driver: MempoolDriver,
@@ -115,16 +116,25 @@ impl Core {
             pending_proposals.insert(genesis_block.round, digest);
             uncommitted_qcs.insert(genesis_block.round, genesis_qc.clone());
 
+            let lvote = Vote {
+                author: name,
+                blk_hash: genesis_block.digest(),
+                kind: VoteType::Normal,
+                round: 0,
+                signature: SignatureShareG1::default(),
+            };
+
             Self {
                 aggregator: Aggregator::new(committee.clone()),
                 committee,
                 committable_blocks: HashMap::new(),
                 consensus_only,
                 last_commit: genesis_block.clone(),
-                last_vote: (GENESIS, genesis_block),
+                last_vote: lvote,
                 last_timeout: GENESIS,
                 leader_elector,
                 locked: QC::genesis(),
+                high_wqc: WQC::genesis(),
                 mempool_driver,
                 name,
                 qc_sender: SimpleSender::new(),
@@ -493,6 +503,9 @@ impl Core {
     async fn send_vote(&mut self, b: Digest, r: Round, t: VoteType) -> ConsensusResult<()> {
         let vote = Vote::new(self.name, b, t.clone(), r, &mut self.bls_signature_service).await;
         debug!("Created {:?}", vote);
+        if vote.kind == VoteType::Normal {
+            self.last_vote = vote.clone();
+        }
 
         let _ = self.handle_vote(&vote).await;
 
@@ -510,7 +523,9 @@ impl Core {
         // Avoid spamming Timeouts.
         if !self.timeout_syncs.contains(&round) {
             let timeout = Timeout::new(
+                self.last_vote.clone(),
                 self.locked.clone(),
+                self.high_wqc.clone(),
                 round,
                 self.name,
                 self.signature_service.clone(),
@@ -711,11 +726,19 @@ impl Core {
         }
     }
 
+    async fn handle_wqc(&mut self, wqc: &WQC) -> ConsensusResult<()> {
+        if self.high_wqc.round < wqc.round {
+            self.high_wqc = wqc.clone();
+        }
+        Ok(())
+    }
+
     async fn handle_tc(&mut self, tc: &TC) -> ConsensusResult<()> {
         debug!("Received TC {:?}", tc);
         if self.round < tc.round + 1 {
             // Process the high QC in case it is new.
             self.handle_qc(&tc.high_qc).await?;
+            self.handle_wqc(&tc.high_wqc).await?;
 
             // Although the paper has only proposal under this condition, this is only to make
             // the proof reasoning simpler. We need not send Timeout messages for lower rounds

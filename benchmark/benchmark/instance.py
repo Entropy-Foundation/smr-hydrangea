@@ -11,13 +11,13 @@ from google.auth import compute_engine
 from google.oauth2 import service_account
 
 GCP_KEY_PATH = '../benchmark/benchmark/key.json'
-SSH_PUB_KEY_PATH = '/home/webclues/.ssh/id_rsa.pub'
+SSH_PUB_KEY_PATH = '/Users/nibesh/.ssh/id_rsa.pub'
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GCP_KEY_PATH
 compute_service = build('compute', 'v1')
 
 # Set up authentication using a service account
-credentials = service_account.Credentials.from_service_account_file('../benchmark/benchmark/key.json')
+credentials = service_account.Credentials.from_service_account_file(GCP_KEY_PATH)
 
 class GCPError(Exception):
     def __init__(self, error):
@@ -25,7 +25,7 @@ class GCPError(Exception):
         super().__init__(self.message)
 
 class InstanceManager:
-    INSTANCE_NAME = 'moonshot-bench'
+    INSTANCE_NAME = 'hydrangea-bench'
     PROJECT_ID = 'supra-testnet-417213'
 ##################################################################
 
@@ -105,7 +105,7 @@ class InstanceManager:
                                 "boot": True,
                                 "autoDelete": True,
                                 "initializeParams": {
-                                    "sourceImage": "projects/ubuntu-os-cloud/global/images/family/ubuntu-2004-lts"
+                                    "sourceImage": "projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts"
                                 }
                             }
                         ],

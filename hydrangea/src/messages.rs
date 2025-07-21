@@ -184,9 +184,16 @@ impl FallbackRecoveryProposal {
             ConsensusError::BlockBadTC(self.digest(), self.block.round, self.tc.round)
         );
 
+        let safe_blk_hash;
+        if self.tc.high_wqc.round > self.tc.high_qc.round {
+            safe_blk_hash = self.tc.high_wqc.blk_hash.clone();
+        } else {
+            safe_blk_hash = self.tc.high_qc.blk_hash.clone();
+        }
+
         // Parent of the block must be certified by qc_prime.
         ensure!(
-            self.block.parent == self.tc.high_qc.blk_hash,
+            self.block.parent == safe_blk_hash,
             ConsensusError::FallbackRecoveryBadParent(self.block.digest())
         );
 
@@ -507,7 +514,10 @@ impl PartialEq for WQC {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Timeout {
+    pub high_vote: Vote,
+    // Todo: Send only the highest ranked certificate among the following two.
     pub high_qc: QC,
+    pub high_wqc: WQC,
     pub round: Round,
     pub author: PublicKey,
     pub signature: Signature,
@@ -515,13 +525,17 @@ pub struct Timeout {
 
 impl Timeout {
     pub async fn new(
+        high_vote: Vote,
         high_qc: QC,
+        high_wqc: WQC,
         round: Round,
         author: PublicKey,
         mut signature_service: SignatureService,
     ) -> Self {
         let timeout = Self {
+            high_vote,
             high_qc,
+            high_wqc,
             round,
             author,
             signature: Signature::default(),
@@ -559,6 +573,7 @@ impl Hash for Timeout {
     fn digest(&self) -> Digest {
         let mut hasher = Sha512::new();
         hasher.update(self.high_qc.round.to_le_bytes());
+        // hasher.update(self.high_wqc.round.to_be_bytes());
         hasher.update(self.round.to_le_bytes());
         Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
     }
@@ -582,6 +597,7 @@ pub struct TC {
     // permanently by always preventing honest leaders from generating valid
     // Fallback Recovery Proposals.
     pub high_qc: QC,
+    pub high_wqc: WQC,
     pub round: Round,
     pub votes: Vec<(PublicKey, Signature, Round)>,
 }
@@ -633,7 +649,7 @@ impl Hash for TC {
         let mut hasher = Sha512::new();
         hasher.update(self.round.to_le_bytes());
         hasher.update(self.high_qc.digest());
-
+        hasher.update(self.high_wqc.digest());
         for (_node, _sig, locked_round) in &self.votes {
             hasher.update(locked_round.to_be_bytes());
         }

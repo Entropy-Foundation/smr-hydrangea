@@ -138,9 +138,16 @@ impl Proposer {
 
     async fn make_fallback_proposal(&mut self, tc: TC) -> ProposalMessage {
         let r = tc.round + 1;
+        let safe_blk_hash;
+        if tc.high_wqc.round > tc.high_qc.round {
+            safe_blk_hash = tc.high_wqc.blk_hash.clone();
+        } else {
+            safe_blk_hash = tc.high_qc.blk_hash.clone();
+        }
+
         let b = Block::new(
             self.name,
-            tc.high_qc.blk_hash.clone(),
+            safe_blk_hash,
             self.get_payload(r),
             r,
             self.signature_service.clone(),
