@@ -184,16 +184,9 @@ impl FallbackRecoveryProposal {
             ConsensusError::BlockBadTC(self.digest(), self.block.round, self.tc.round)
         );
 
-        let safe_blk_hash;
-        if self.tc.high_wqc.round > self.tc.high_qc.round {
-            safe_blk_hash = self.tc.high_wqc.blk_hash.clone();
-        } else {
-            safe_blk_hash = self.tc.high_qc.blk_hash.clone();
-        }
-
         // Parent of the block must be certified by qc_prime.
         ensure!(
-            self.block.parent == safe_blk_hash,
+            self.block.parent == self.tc.high_qc.blk_hash,
             ConsensusError::FallbackRecoveryBadParent(self.block.digest())
         );
 
@@ -356,7 +349,6 @@ pub struct QC {
     pub kind: VoteType,
     pub round: Round,
     pub votes: (Vec<u128>, SignatureShareG1),
-    pub fast_quorum: bool,
 }
 
 impl QC {
@@ -366,7 +358,6 @@ impl QC {
             kind: VoteType::Commit,
             round: 0,
             votes: (Vec::new(), SignatureShareG1::default()),
-            fast_quorum: false,
         }
     }
 
@@ -440,84 +431,9 @@ impl PartialEq for QC {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Default)]
-pub struct WQC {
-    pub blk_hash: Digest,
-    pub round: Round,
-    pub votes: (Vec<u128>, SignatureShareG1),
-}
-
-impl WQC {
-    pub fn genesis() -> Self {
-        WQC {
-            blk_hash: Block::genesis().digest(),
-            round: 0,
-            votes: (Vec::new(), SignatureShareG1::default()),
-        }
-    }
-
-    pub fn is_well_formed(
-        &self,
-        committee: &Committee,
-        sorted_keys: &Vec<PublicKeyShareG2>,
-        combined_key: &PublicKeyShareG2,
-    ) -> ConsensusResult<()> {
-        if self.round == 0 {
-            Ok(())
-        } else {
-            let mut ids = Vec::new();
-
-            for idx in 0..committee.size() {
-                let x = idx / 128;
-                let chunk = self.votes.0[x];
-                let ridx = idx - x * 128;
-                if chunk & 1 << ridx != 0 {
-                    ids.push(idx);
-                }
-            }
-
-            let agg_pk = remove_pubkeys(combined_key, ids, &sorted_keys);
-
-            // Check the signatures.
-            SignatureShareG1::verify_batch(&self.digest().0, &agg_pk, &self.votes.1)
-                .map_err(ConsensusError::from)
-        }
-    }
-}
-
-impl Hash for WQC {
-    fn digest(&self) -> Digest {
-        let mut hasher = Sha512::new();
-        hasher.update(&self.blk_hash);
-        hasher.update(self.round.to_le_bytes());
-        Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
-    }
-}
-
-impl fmt::Display for WQC {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "WQC({}, {})", self.blk_hash, self.round)
-    }
-}
-
-impl fmt::Debug for WQC {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "WQC({}, {})", self.blk_hash, self.round)
-    }
-}
-
-impl PartialEq for WQC {
-    fn eq(&self, other: &Self) -> bool {
-        self.blk_hash == other.blk_hash && self.round == other.round
-    }
-}
-
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Timeout {
-    pub high_vote: Vote,
-    // Todo: Send only the highest ranked certificate among the following two.
     pub high_qc: QC,
-    pub high_wqc: WQC,
     pub round: Round,
     pub author: PublicKey,
     pub signature: Signature,
@@ -525,17 +441,13 @@ pub struct Timeout {
 
 impl Timeout {
     pub async fn new(
-        high_vote: Vote,
         high_qc: QC,
-        high_wqc: WQC,
         round: Round,
         author: PublicKey,
         mut signature_service: SignatureService,
     ) -> Self {
         let timeout = Self {
-            high_vote,
             high_qc,
-            high_wqc,
             round,
             author,
             signature: Signature::default(),
@@ -573,7 +485,6 @@ impl Hash for Timeout {
     fn digest(&self) -> Digest {
         let mut hasher = Sha512::new();
         hasher.update(self.high_qc.round.to_le_bytes());
-        // hasher.update(self.high_wqc.round.to_be_bytes());
         hasher.update(self.round.to_le_bytes());
         Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
     }
@@ -597,7 +508,6 @@ pub struct TC {
     // permanently by always preventing honest leaders from generating valid
     // Fallback Recovery Proposals.
     pub high_qc: QC,
-    pub high_wqc: WQC,
     pub round: Round,
     pub votes: Vec<(PublicKey, Signature, Round)>,
 }
@@ -649,7 +559,6 @@ impl Hash for TC {
         let mut hasher = Sha512::new();
         hasher.update(self.round.to_le_bytes());
         hasher.update(self.high_qc.digest());
-        hasher.update(self.high_wqc.digest());
         for (_node, _sig, locked_round) in &self.votes {
             hasher.update(locked_round.to_be_bytes());
         }

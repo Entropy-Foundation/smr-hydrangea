@@ -2,7 +2,6 @@ use crate::consensus::{ConsensusMessage, ProposalMessage, Round};
 use crate::messages::{Block, FallbackRecoveryProposal, NormalProposal, QC, TC};
 use bytes::Bytes;
 use config::Committee;
-use crypto::Hash;
 use crypto::{PublicKey, SignatureService};
 use log::{debug, info};
 use network::{CancelHandler, ReliableSender};
@@ -79,7 +78,7 @@ impl Proposer {
     // Such pending txs should be those included in blocks that have been proposed/voted on
     // but have not yet satisfied the commit rule. Txs should only be removed from the Proposer
     // once they have been committed.
-    fn get_payload(&mut self, r: Round) -> Vec<Certificate> {
+    fn get_payload(&mut self) -> Vec<Certificate> {
         if self.consensus_only {
             let mut payload = Vec::new();
 
@@ -138,17 +137,10 @@ impl Proposer {
 
     async fn make_fallback_proposal(&mut self, tc: TC) -> ProposalMessage {
         let r = tc.round + 1;
-        let safe_blk_hash;
-        if tc.high_wqc.round > tc.high_qc.round {
-            safe_blk_hash = tc.high_wqc.blk_hash.clone();
-        } else {
-            safe_blk_hash = tc.high_qc.blk_hash.clone();
-        }
-
         let b = Block::new(
             self.name,
-            safe_blk_hash,
-            self.get_payload(r),
+            tc.high_qc.blk_hash.clone(),
+            self.get_payload(),
             r,
             self.signature_service.clone(),
         )
@@ -162,7 +154,7 @@ impl Proposer {
         let b = Block::new(
             self.name,
             parent_qc.blk_hash.clone(),
-            self.get_payload(r),
+            self.get_payload(),
             r,
             self.signature_service.clone(),
         )

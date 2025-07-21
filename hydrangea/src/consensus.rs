@@ -8,7 +8,6 @@ use crate::messages::{Block, FallbackRecoveryProposal, NormalProposal, Timeout, 
 use crate::proposer::Proposer;
 use crate::synchronizer::Synchronizer;
 use async_trait::async_trait;
-use blsttc::PublicKeyShareG2;
 use bytes::Bytes;
 use config::{Committee, Parameters};
 use crypto::{BlsSignatureService, Digest, PublicKey, SignatureService};

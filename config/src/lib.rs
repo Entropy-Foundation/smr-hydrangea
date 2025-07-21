@@ -207,7 +207,6 @@ pub struct Committee {
     pub f: u32,
     pub c: u32,
     pub k: u32,
-    pub p: u32,
 }
 
 impl Import for Committee {}
@@ -233,7 +232,6 @@ impl Committee {
             f,
             c,
             k,
-            p: p as u32,
         };
         committee
     }
@@ -279,10 +277,6 @@ impl Committee {
         // then (2 N + 3) / 3 = 2f + 1 + (2k + 2)/3 = 2f + 1 + k = N - f
         let x = (self.n + self.f + 1) as f64 / 2.0;
         return x.ceil() as u32;
-    }
-
-    pub fn fast_commit_threshold(&self) -> Stake {
-        self.n - self.p
     }
 
     /// Returns the stake required to reach availability (f+1).
