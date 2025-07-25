@@ -143,6 +143,9 @@ impl Parameters {
         info!("Using {:?} leader elector", self.leader_elector);
         info!("Timeout delay set to {} ms", self.timeout_delay);
         info!("Header size set to {} B", self.header_size);
+        info!("F value set to {}", self.f);
+        info!("C value set to {}", self.c);
+        info!("K value set to {}", self.k);
         info!("Max header delay set to {} ms", self.max_header_delay);
         info!("Garbage collection depth set to {} rounds", self.gc_depth);
         info!("Sync retry delay set to {} ms", self.sync_retry_delay);

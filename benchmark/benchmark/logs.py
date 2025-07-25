@@ -29,7 +29,7 @@ class LogParser:
         # Parse the primaries logs.
         try:
             # Header should be included in the first 1000 characters.
-            header_len = 1000
+            header_len = 1100
             # Header is the same for all nodes.
             header = primaries[0][0:header_len]
             self.config = self._parse_config(header)
@@ -282,6 +282,15 @@ class LogParser:
             'leader_elector': str(
                 search(r'Using (.*) leader elector', header).group(1)
             ),
+            'f': str(
+                search(r'F value set to (\d+)', header).group(1)
+            ),
+            'c': str(
+                search(r'C value set to (\d+)', header).group(1)
+            ),
+            'k': str(
+                search(r'K value set to (\d+)', header).group(1)
+            ),
         }
         
     def _merge_maps(self, ms):
@@ -486,6 +495,9 @@ class LogParser:
                 f' Leader elector: {leader_elector}\n'
                 f' Faults: {faults} node(s)\n'
                 f' Committee size: {self.committee_size} node(s)\n'
+                f' F: {self.config['f']}\n'
+                f' C: {self.config['c']}\n'
+                f' K: {self.config['k']}\n'
                 '\n'
                 f' Block size: {block_size:,} Certificates\n'
                 f' Timeout delay: {timeout_delay:,} ms\n'
