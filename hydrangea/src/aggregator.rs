@@ -1,6 +1,6 @@
 use crate::consensus::Round;
 use crate::error::ConsensusResult;
-use crate::messages::{Timeout, Vote, QC, TC};
+use crate::messages::{Timeout, Vote, VoteType, QC, TC};
 use blsttc::{PublicKeyShareG2, SignatureShareG1};
 use config::{Committee, Stake};
 use crypto::{
@@ -130,7 +130,10 @@ impl QCMaker {
                 }
 
                 self.weight += committee.stake(&author);
-                if self.weight == committee.quorum_threshold() {
+                if vote.kind == VoteType::Normal && self.weight == committee.quorum_threshold()
+                    || vote.kind == VoteType::Commit
+                        && self.weight == committee.slow_commit_threshold()
+                {
                     self.weight = 0; // Ensures QC of this type is only made once.
                     self.is_qc_formed = true;
 
@@ -209,7 +212,7 @@ impl TCMaker {
                 self.high_qc = timeout.high_qc;
             }
 
-            if self.weight >= committee.quorum_threshold() {
+            if self.weight >= committee.view_change_threshold() {
                 // We do not reset the weight after creating the TC because we might
                 // still need to send Timeout messages for this round to our honest
                 // peers in case they either were censored by the Byzantine nodes or

@@ -212,6 +212,9 @@ pub struct Committee {
     pub f: u32,
     pub c: u32,
     pub k: u32,
+    pub quorum_threshold: u32,
+    pub slow_commit_threshold: u32,
+    pub view_change_threshold: u32,
 }
 
 impl Import for Committee {}
@@ -227,7 +230,10 @@ impl Committee {
         let mut keys: Vec<_> = authorities.iter().map(|(_, x)| x.bls_pubkey_g2).collect();
         keys.sort();
 
-        let p = (c + k) as f64 / 2.0;
+        let x = (n + f + 1) as f64 / 2.0;
+        let quorum_threshold = x.ceil() as u32;
+        let slow_commit_threshold = 2 * f + c + 1;
+        let view_change_threshold = n - f - c;
 
         let committee = Self {
             authorities,
@@ -237,6 +243,9 @@ impl Committee {
             f,
             c,
             k,
+            quorum_threshold,
+            slow_commit_threshold,
+            view_change_threshold
         };
         committee
     }
@@ -280,12 +289,17 @@ impl Committee {
             .collect()
     }
 
-    /// Returns the stake required to reach a quorum (2f+1).
+    /// Returns the stake required to reach a quorum (n+f+1)/2.
     pub fn quorum_threshold(&self) -> Stake {
-        // If N = 3f + 1 + k (0 <= k < 3)
-        // then (2 N + 3) / 3 = 2f + 1 + (2k + 2)/3 = 2f + 1 + k = N - f
-        let x = (self.n + self.f + 1) as f64 / 2.0;
-        return x.ceil() as u32;
+        self.quorum_threshold
+    }
+
+    pub fn slow_commit_threshold(&self) -> Stake {
+        self.slow_commit_threshold
+    }
+
+    pub fn view_change_threshold(&self) -> Stake {
+        self.view_change_threshold
     }
 
     /// Returns the stake required to reach availability (f+1).
