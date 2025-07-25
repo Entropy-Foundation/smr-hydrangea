@@ -65,6 +65,7 @@ pub enum LeaderElectorKind {
     FailureMidCase,
     FailureWorstCase,
     FairSuccession,
+    Simple,
 }
 
 #[derive(Deserialize, Clone)]
@@ -119,7 +120,7 @@ impl Default for Parameters {
             batch_size: 500_000,
             max_batch_delay: 100,
             use_vote_aggregator: false,
-            leader_elector: LeaderElectorKind::FairSuccession,
+            leader_elector: LeaderElectorKind::Simple,
             n: 15,
             f: 3,
             c: 2,
@@ -178,6 +179,7 @@ pub struct WorkerAddresses {
 
 #[derive(Clone, Deserialize)]
 pub struct Authority {
+    pub id: u32,
     pub bls_pubkey_g1: PublicKeyShareG1,
     pub bls_pubkey_g2: PublicKeyShareG2,
 
@@ -260,6 +262,10 @@ impl Committee {
     /// Return the stake of a specific authority.
     pub fn stake(&self, name: &PublicKey) -> Stake {
         self.authorities.get(&name).map_or_else(|| 0, |x| x.stake)
+    }
+
+    pub fn id(&self, name: &PublicKey) -> u32 {
+        self.authorities.get(&name).unwrap().id
     }
 
     /// Returns the stake of all authorities except `myself`.

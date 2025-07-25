@@ -85,7 +85,7 @@ class Committee:
         num_authorities = len(addresses)
 
         for i, (name, hosts) in enumerate(addresses.items()):
-            # port = base_port
+            port = base_port
             host = hosts.pop(0)
             consensus_addr = {
                 'consensus_to_consensus': f'{host}:{port}',
@@ -109,6 +109,7 @@ class Committee:
 
             json['authorities'][name] = {
                 # Corresponds to the determination of faulty nodes in primary_addresses.
+                'id': i,
                 'bls_pubkey_g1': bls_pubkeys_g1[i],
                 'bls_pubkey_g2': bls_pubkeys_g2[i],
                 'is_honest': i < num_authorities - faults,
