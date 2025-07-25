@@ -39,8 +39,8 @@ def local(ctx, debug=False, consensus_only=True, aggregate=False):
         'batch_size': 512_000,  # bytes
         'max_batch_delay': 200,  # ms
         'use_vote_aggregator': aggregate,
-        # FailureBestCase | FailureMidCase | FailureWorstCase | FairSuccession
-        'leader_elector': 'FailureBestCase',
+        # FailureBestCase | FailureMidCase | FailureWorstCase | FairSuccession | Simple
+        'leader_elector': 'Simple',
         'threadpool_size' : 4,
     }
     try:
@@ -114,17 +114,17 @@ def create_firewall(ctx):
 
 
 @task
-def remote(ctx, burst=50, debug=False, consensus_only=False, update=True, aggregate=False):
+def remote(ctx, burst=50, debug=False, consensus_only=True, update=True, aggregate=False):
     ''' Run benchmarks on AWS '''
     
     bench_params = {
         'faults': 0,
-        'nodes': [10],
+        'nodes': [8],
         'workers': 1,
         'collocate': True,
         'rate': [100_000],
         'tx_size': 512,
-        'duration': 120,
+        'duration': 60,
         'runs': 1,
         'burst': [burst],
     }
@@ -139,10 +139,10 @@ def remote(ctx, burst=50, debug=False, consensus_only=False, update=True, aggreg
  
     node_params = {
         'n': bench_params['nodes'][0], # Number of nodes
-        'f': 2, #Number of Byzantine parties tolerated
-        'c': 4, # Number of crash faults,
+        'f': 1, #Number of Byzantine parties tolerated
+        'c': 2, # Number of crash faults,
         'k': 0, # a parameter
-        'max_block_size': 150,
+        'max_block_size': 10,
         'consensus_only': consensus_only,
         'timeout_delay': 5_000,  # ms
         'header_size': 1024_000,  # bytes
@@ -153,8 +153,8 @@ def remote(ctx, burst=50, debug=False, consensus_only=False, update=True, aggreg
         'batch_size': 1024_000,  # bytes
         'max_batch_delay': 2000,  # ms
         'use_vote_aggregator': aggregate,
-        # FailureBestCase | FailureMidCase | FailureWorstCase | FairSuccession
-        'leader_elector': 'FailureBestCase',
+        # FailureBestCase | FailureMidCase | FailureWorstCase | FairSuccession | Simple
+        'leader_elector': 'Simple',
         'threadpool_size' : 4,
     }
 

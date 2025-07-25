@@ -6,55 +6,64 @@ use std::collections::{HashMap, VecDeque};
 // Note: There is likely a better way to do the below. My Rust needs work.
 /// Factory for the various leader electors to enable instantiation at runtime.
 pub struct LeaderElector {
-    maybe_fair_succession: Option<DeterministicFairSuccessionLeaderElector>,
-    maybe_failure: Option<FailureSimulationLeaderElector>,
+    // maybe_fair_succession: Option<DeterministicFairSuccessionLeaderElector>,
+    // maybe_failure: Option<FailureSimulationLeaderElector>,
+    simple: SimpleLeaderElector
 }
 
 impl LeaderElector {
     pub fn new(kind: LeaderElectorKind, committee: Committee) -> Self {
-        let (maybe_failure, maybe_fair_succession) = match kind {
-            LeaderElectorKind::FailureBestCase => (
-                Some(FailureSimulationLeaderElector::new(
-                    committee,
-                    FailureScenario::BEST,
-                )),
-                None,
-            ),
-            LeaderElectorKind::FailureMidCase => (
-                Some(FailureSimulationLeaderElector::new(
-                    committee,
-                    FailureScenario::MID,
-                )),
-                None,
-            ),
-            LeaderElectorKind::FailureWorstCase => (
-                Some(FailureSimulationLeaderElector::new(
-                    committee,
-                    FailureScenario::WORST,
-                )),
-                None,
-            ),
-            LeaderElectorKind::FairSuccession => (
-                None,
-                Some(DeterministicFairSuccessionLeaderElector::new(committee)),
-            ),
-        };
+        // let (maybe_failure, maybe_fair_succession) = match kind {
+        //     LeaderElectorKind::FailureBestCase => (
+        //         Some(FailureSimulationLeaderElector::new(
+        //             committee,
+        //             FailureScenario::BEST,
+        //         )),
+        //         None,
+        //     ),
+        //     LeaderElectorKind::FailureMidCase => (
+        //         Some(FailureSimulationLeaderElector::new(
+        //             committee,
+        //             FailureScenario::MID,
+        //         )),
+        //         None,
+        //     ),
+        //     LeaderElectorKind::FailureWorstCase => (
+        //         Some(FailureSimulationLeaderElector::new(
+        //             committee,
+        //             FailureScenario::WORST,
+        //         )),
+        //         None,
+        //     ),
+        //     LeaderElectorKind::FairSuccession => (
+        //         None,
+        //         Some(DeterministicFairSuccessionLeaderElector::new(committee)),
+        //     ),
+        //     LeaderElectorKind::Simple => (
+        //         None,
+        //         Some(SimpleLeaderElector::new(committee)),
+        //     )
+        // };
 
+        // Self {
+        //     maybe_fair_succession,
+        //     maybe_failure,
+        // }
         Self {
-            maybe_fair_succession,
-            maybe_failure,
+            simple: SimpleLeaderElector::new(committee)
         }
     }
 
     pub fn get_leader(&self, round: Round) -> PublicKey {
-        match (
-            self.maybe_failure.clone(),
-            self.maybe_fair_succession.clone(),
-        ) {
-            (Some(l), None) => l.get_leader(round),
-            (None, Some(l)) => l.get_leader(round),
-            _ => panic!("Unreachable by construction."),
-        }
+        // match (
+        //     self.maybe_failure.clone(),
+        //     self.maybe_fair_succession.clone(),
+        // ) {
+        //     (Some(l), None) => l.get_leader(round),
+        //     (None, Some(l)) => l.get_leader(round),
+        //     _ => panic!("Unreachable by construction."),
+        // }
+        self.simple.get_leader(round)
     }
 }
 
@@ -141,6 +150,33 @@ impl DeterministicFairSuccessionLeaderElector {
         let index = round as usize % self.schedule.len();
         let leader = self.schedule[index];
         self.nodes_ids[leader]
+    }
+}
+
+
+pub struct SimpleLeaderElector {
+    node_ids: Vec<PublicKey>,
+    n: usize
+}
+
+impl SimpleLeaderElector {
+    pub fn new(committee: Committee) -> Self {
+        let n = committee.size();
+        // Currently only support a static validator set, so can set this during construction.
+        let id_map: HashMap<u32, PublicKey> = committee.authorities.iter().map(|(x, y)| (y.id, *x) ).collect();
+        let mut node_ids = Vec::new();
+        for idx in 0..n as u32 {
+            node_ids.push(id_map[&idx]);
+        }
+        Self {
+            node_ids,
+            n
+        }
+    }
+
+    pub fn get_leader(&self, round: Round) -> PublicKey {
+        let index = round as usize % self.n;
+        self.node_ids[index]
     }
 }
 
