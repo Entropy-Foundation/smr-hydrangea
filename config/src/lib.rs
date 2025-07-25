@@ -213,6 +213,8 @@ pub struct Committee {
     pub c: u32,
     pub k: u32,
     pub p: u32,
+    pub slow_commit_threshold: u32,
+    pub fast_commit_threshold: u32,
 }
 
 impl Import for Committee {}
@@ -229,6 +231,8 @@ impl Committee {
         keys.sort();
 
         let p = (c + k) as f64 / 2.0;
+        let slow_commit_threshold = 2 * f + c + 1;
+        let fast_commit_threshold = n - p as u32;
 
         let committee = Self {
             authorities,
@@ -239,6 +243,8 @@ impl Committee {
             c,
             k,
             p: p as u32,
+            slow_commit_threshold,
+            fast_commit_threshold,
         };
         committee
     }
@@ -282,7 +288,7 @@ impl Committee {
             .collect()
     }
 
-    /// Returns the stake required to reach a quorum (2f+1).
+    /// Returns the stake required to reach a quorum (n+f+1)/2.
     pub fn quorum_threshold(&self) -> Stake {
         // If N = 3f + 1 + k (0 <= k < 3)
         // then (2 N + 3) / 3 = 2f + 1 + (2k + 2)/3 = 2f + 1 + k = N - f
@@ -290,8 +296,12 @@ impl Committee {
         return x.ceil() as u32;
     }
 
-    pub fn fast_commit_threshold(&self) -> Stake {
-        self.n - self.p
+    pub fn fast_commit_quorum_threshold(&self) -> Stake {
+        self.fast_commit_threshold
+    }
+
+    pub fn slow_commit_threshold(&self) -> Stake {
+        self.slow_commit_threshold
     }
 
     /// Returns the stake required to reach availability (f+1).

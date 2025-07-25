@@ -1,6 +1,6 @@
 use crate::consensus::Round;
 use crate::error::ConsensusResult;
-use crate::messages::{Timeout, Vote, QC, TC, WQC};
+use crate::messages::{Timeout, Vote, VoteType, QC, TC, WQC};
 use blsttc::{PublicKeyShareG2, SignatureShareG1};
 use config::{Committee, Stake};
 use crypto::{
@@ -135,7 +135,10 @@ impl QCMaker {
                 }
 
                 self.weight += committee.stake(&author);
-                if self.weight == committee.quorum_threshold() {
+                if vote.kind == VoteType::Normal && self.weight == committee.quorum_threshold()
+                    || vote.kind == VoteType::Commit
+                        && self.weight == committee.slow_commit_threshold()
+                {
                     // self.weight = 0; // Ensures QC of this type is only made once.
                     if !check_fast_threshold {
                         self.is_qc_formed = true;
@@ -164,7 +167,9 @@ impl QCMaker {
                         votes: (self.pk_bit_vec.clone(), self.agg_sign.clone()),
                         fast_quorum: false,
                     }));
-                } else if self.weight == committee.fast_commit_threshold() {
+                } else if vote.kind == VoteType::Normal
+                    && self.weight == committee.fast_commit_quorum_threshold()
+                {
                     self.weight = 0;
                     self.is_qc_formed = true;
                     let mut ids = Vec::new();

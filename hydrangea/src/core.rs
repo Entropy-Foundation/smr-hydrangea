@@ -4,8 +4,7 @@ use crate::error::{ConsensusError, ConsensusResult};
 use crate::leader::LeaderElector;
 use crate::mempool::MempoolDriver;
 use crate::messages::{
-    Block, FallbackRecoveryProposal, NormalProposal, Timeout, Vote, VoteType, QC, TC,
-    WQC,
+    Block, FallbackRecoveryProposal, NormalProposal, Timeout, Vote, VoteType, QC, TC, WQC,
 };
 use crate::proposer::{ProposalTrigger, ProposerMessage};
 use crate::synchronizer::Synchronizer;
