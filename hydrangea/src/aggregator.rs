@@ -314,7 +314,7 @@ impl TCMaker {
                 self.high_wqc = timeout.high_wqc;
             }
 
-            if self.weight >= committee.quorum_threshold() {
+            if self.weight >= committee.view_change_threshold() {
                 // We do not reset the weight after creating the TC because we might
                 // still need to send Timeout messages for this round to our honest
                 // peers in case they either were censored by the Byzantine nodes or
