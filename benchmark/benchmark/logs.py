@@ -495,9 +495,9 @@ class LogParser:
                 f' Leader elector: {leader_elector}\n'
                 f' Faults: {faults} node(s)\n'
                 f' Committee size: {self.committee_size} node(s)\n'
-                f' F: {self.config['f']}\n'
-                f' C: {self.config['c']}\n'
-                f' K: {self.config['k']}\n'
+                f" F: {self.config['f']}\n"
+                f" C: {self.config['c']}\n"
+                f" K: {self.config['k']}\n"
                 '\n'
                 f' Block size: {block_size:,} Certificates\n'
                 f' Timeout delay: {timeout_delay:,} ms\n'
