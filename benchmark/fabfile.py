@@ -119,7 +119,7 @@ def remote(ctx, burst=50, debug=False, consensus_only=True, update=True, aggrega
     
     bench_params = {
         'faults': 0,
-        'nodes': [8],
+        'nodes': [20],
         'workers': 1,
         'collocate': True,
         'rate': [100_000],
@@ -139,8 +139,8 @@ def remote(ctx, burst=50, debug=False, consensus_only=True, update=True, aggrega
  
     node_params = {
         'n': bench_params['nodes'][0], # Number of nodes
-        'f': 1, #Number of Byzantine parties tolerated
-        'c': 2, # Number of crash faults,
+        'f': 3, #Number of Byzantine parties tolerated
+        'c': 5, # Number of crash faults,
         'k': 0, # a parameter
         'max_block_size': 10,
         'consensus_only': consensus_only,
