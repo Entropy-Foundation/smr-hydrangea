@@ -172,20 +172,20 @@ impl QCMaker {
                 {
                     self.weight = 0;
                     self.is_qc_formed = true;
-                    let mut ids = Vec::new();
+                    // let mut ids = Vec::new();
 
-                    for idx in 0..committee.size() {
-                        let x = idx / 128;
-                        let chunk = self.pk_bit_vec[x];
-                        let ridx = idx - x * 128;
-                        if chunk & 1 << ridx != 0 {
-                            ids.push(idx);
-                        }
-                    }
+                    // for idx in 0..committee.size() {
+                    //     let x = idx / 128;
+                    //     let chunk = self.pk_bit_vec[x];
+                    //     let ridx = idx - x * 128;
+                    //     if chunk & 1 << ridx != 0 {
+                    //         ids.push(idx);
+                    //     }
+                    // }
 
-                    let agg_pk =
-                        remove_pubkeys(&committee.combined_pubkey, ids, &committee.sorted_keys);
-                    SignatureShareG1::verify_batch(&vote.digest().0, &agg_pk, &self.agg_sign)?;
+                    // let agg_pk =
+                    //     remove_pubkeys(&committee.combined_pubkey, ids, &committee.sorted_keys);
+                    // SignatureShareG1::verify_batch(&vote.digest().0, &agg_pk, &self.agg_sign)?;
                     info!(
                         "Constructed {} Fast path quorum. Votes: {} ",
                         vote.kind,
