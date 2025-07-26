@@ -582,9 +582,6 @@ class Bench:
         except SubprocessError as e:
             traceback.print_exc()
             raise BenchError('Failed to configure nodes', e)
-
-        
-        return
     
         names = names[:len(names) - bench_parameters.faults]
         msg = f'Uploading configuration files'

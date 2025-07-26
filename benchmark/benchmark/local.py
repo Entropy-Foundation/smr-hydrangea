@@ -78,7 +78,8 @@ class LocalBench:
             names = [x.name for x in keys]
             bls_pubkeys_g1 = [_.nameg1 for _ in bls_keys]
             bls_pubkeys_g2 = [_.nameg2 for _ in bls_keys]
-            committee = LocalCommittee(names, self.BASE_PORT, self.workers, self.faults, bls_pubkeys_g1, bls_pubkeys_g2)
+            hosts_rtt_result = {'127.0.0.1': ['127.0.0.1' for _ in names]}
+            committee = LocalCommittee(names, self.BASE_PORT, self.workers, self.faults, bls_pubkeys_g1, bls_pubkeys_g2, hosts_rtt_result)
             committee.print(PathMaker.committee_file())
 
             self.node_parameters.print(PathMaker.parameters_file())

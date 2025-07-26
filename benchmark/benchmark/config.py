@@ -62,7 +62,7 @@ class Committee:
     def __init__(self, json):
         self.json = json
 
-    def address_list_to_json(addresses, base_port, faults, bls_pubkeys_g1, bls_pubkeys_g2):
+    def address_list_to_json(addresses, base_port, faults, bls_pubkeys_g1, bls_pubkeys_g2, hosts_rtt_result):
         ''' The `addresses` field looks as follows:
             { 
                 "name": ["host", "host", ...],
@@ -84,8 +84,10 @@ class Committee:
         json = {'authorities': OrderedDict()}
         num_authorities = len(addresses)
 
+        host_name_dict = {host[0]: name for (name, host) in addresses.items()}
+
         for i, (name, hosts) in enumerate(addresses.items()):
-            # port = base_port
+            port = base_port
             host = hosts.pop(0)
             consensus_addr = {
                 'consensus_to_consensus': f'{host}:{port}',
@@ -116,13 +118,14 @@ class Committee:
                 'stake': 1,
                 'consensus': consensus_addr,
                 'primary': primary_addr,
-                'workers': workers_addr
+                'workers': workers_addr,
+                'priority_list': [host_name_dict[x] for x in hosts_rtt_result[host]]
             }
         return json
 
     @classmethod
-    def from_address_list(cls, addresses, base_port, faults, bls_pubkeys_g1, bls_pubkeys_g2):
-        return cls(Committee.address_list_to_json(addresses, base_port, faults, bls_pubkeys_g1, bls_pubkeys_g2))
+    def from_address_list(cls, addresses, base_port, faults, bls_pubkeys_g1, bls_pubkeys_g2, hosts_rtt_result):
+        return cls(Committee.address_list_to_json(addresses, base_port, faults, bls_pubkeys_g1, bls_pubkeys_g2, hosts_rtt_result))
 
     @classmethod
     def from_file(cls, filename):
@@ -202,6 +205,9 @@ class Committee:
                 ips.add(self.ip(worker['transactions']))
 
         return list(ips)
+    
+    def get_id(self, name):
+        return self.json['authorities'][name]['id']
 
     def remove_nodes(self, nodes):
         ''' remove the `nodes` last nodes from the committee. '''
@@ -234,7 +240,7 @@ class Committee:
 
 
 class LocalCommittee(Committee):
-    def __init__(self, names, port, workers, faults, bls_pubkeys_g1, bls_pubkeys_g2):
+    def __init__(self, names, port, workers, faults, bls_pubkeys_g1, bls_pubkeys_g2, hosts_rtt_result):
         assert isinstance(names, list)
         assert all(isinstance(x, str) for x in names)
         assert isinstance(port, int)
@@ -242,7 +248,7 @@ class LocalCommittee(Committee):
         assert isinstance(bls_pubkeys_g1, list)
         assert isinstance(bls_pubkeys_g2, list)
         addresses = OrderedDict((x, ['127.0.0.1']*(1+workers)) for x in names)
-        json = Committee.address_list_to_json(addresses, port, faults, bls_pubkeys_g1,bls_pubkeys_g2)
+        json = Committee.address_list_to_json(addresses, port, faults, bls_pubkeys_g1,bls_pubkeys_g2, hosts_rtt_result)
         super().__init__(json)
 
 
