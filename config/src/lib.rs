@@ -195,6 +195,7 @@ pub struct Authority {
     pub primary: PrimaryAddresses,
     /// Map of workers' id and their network addresses.
     pub workers: HashMap<WorkerId, WorkerAddresses>,
+    pub priority_list: Vec<PublicKey>
 }
 
 #[derive(Clone, Deserialize)]
@@ -206,6 +207,7 @@ impl Import for Comm {}
 #[derive(Clone, Deserialize)]
 pub struct Committee {
     pub authorities: BTreeMap<PublicKey, Authority>,
+    pub rtt_others: Vec<Authority>, 
     pub sorted_keys: Vec<PublicKeyShareG2>,
     pub combined_pubkey: PublicKeyShareG2,
     pub n: u32,
@@ -223,6 +225,7 @@ impl Import for Committee {}
 
 impl Committee {
     pub fn new(
+        name: PublicKey,
         authorities: BTreeMap<PublicKey, Authority>,
         n: u32,
         f: u32,
@@ -232,15 +235,26 @@ impl Committee {
         let mut keys: Vec<_> = authorities.iter().map(|(_, x)| x.bls_pubkey_g2).collect();
         keys.sort();
 
-        let p = (c + k) as f64 / 2.0;
+        let p = ((c + k) as f64 / 2.0) as u32;
         let x = (n + f + 1) as f64 / 2.0;
         let quorum_threshold = x.ceil() as u32;
         let slow_commit_threshold = 2 * f + c + 1;
         let fast_commit_threshold = n - p as u32;
         let view_change_threshold = n - f - c;
 
+        let me = authorities.get(&name).unwrap();
+        let mut rtt_others = Vec::new();
+        for idx in p..(n-1) {
+            rtt_others.push(authorities.get(&me.priority_list[idx as usize]).unwrap().clone());
+        }
+        for idx in 0..p {
+            rtt_others.push(authorities.get(&me.priority_list[idx as usize]).unwrap().clone());
+        }
+
+
         let committee = Self {
             authorities,
+            rtt_others,
             sorted_keys: keys.clone(),
             combined_pubkey: combine_keys(&keys),
             n,
@@ -328,20 +342,21 @@ impl Committee {
     }
 
     /// Returns the addresses of all consensus nodes except `myself`.
-    pub fn others_consensus(&self, myself: &PublicKey) -> Vec<(PublicKey, ConsensusAddresses)> {
-        self.authorities
-            .iter()
-            // Note: Only return honest addresses for benchmarking so that we don't waste
-            // time trying to connect to Byzantine nodes, which could obscure the results.
-            .filter(|(name, attrs)| name != &myself && attrs.is_honest)
-            .map(|(name, authority)| (*name, authority.consensus.clone()))
-            .collect()
+    pub fn others_consensus(&self, myself: &PublicKey) -> Vec<ConsensusAddresses> {
+        self.rtt_others.iter().map(|x| x.consensus.clone()).collect()
+        // self.authorities
+        //     .iter()
+        //     // Note: Only return honest addresses for benchmarking so that we don't waste
+        //     // time trying to connect to Byzantine nodes, which could obscure the results.
+        //     .filter(|(name, attrs)| name != &myself && attrs.is_honest)
+        //     .map(|(name, authority)| (*name, authority.consensus.clone()))
+        //     .collect()
     }
 
     pub fn others_consensus_sockets(&self, myself: &PublicKey) -> Vec<SocketAddr> {
         self.others_consensus(myself)
             .into_iter()
-            .map(|(_, x)| x.consensus_to_consensus)
+            .map(|x| x.consensus_to_consensus)
             .collect()
     }
 

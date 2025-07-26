@@ -135,7 +135,7 @@ impl Synchronizer {
                                 let addresses = committee
                                     .others_consensus(&name)
                                     .into_iter()
-                                    .map(|(_, x)| x.consensus_to_consensus)
+                                    .map(|x| x.consensus_to_consensus)
                                     .collect();
                                 let message = ConsensusMessage::SyncRequest(digest.clone(), name);
                                 let message = bincode::serialize(&message)

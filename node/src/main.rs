@@ -123,6 +123,7 @@ async fn run(matches: &ArgMatches<'_>) -> Result<()> {
     };
 
     let committee = Committee::new(
+        name,
         comm.authorities,
         parameters.n,
         parameters.f,

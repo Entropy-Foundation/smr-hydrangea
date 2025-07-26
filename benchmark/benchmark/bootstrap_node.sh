@@ -61,6 +61,9 @@ sudo apt-get -y autoremove
 # The following dependencies prevent the error: [error: linker `cc` not found].
 sudo apt-get -y install build-essential
 sudo apt-get -y install cmake
+sudo apt-get -y install python3-pip
+
+pip install ping3
 
 # Install rust (non-interactive).
 curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y

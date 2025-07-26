@@ -10,6 +10,7 @@ import subprocess
 from subprocess import SubprocessError
 import traceback
 from datetime import datetime
+import json
 
 from benchmark.config import Committee, BlsKey, NodeParameters, BenchParameters, ConfigError, EdKey
 from benchmark.utils import BenchError, Print, PathMaker, progress_bar
@@ -288,7 +289,7 @@ class Bench:
             await sftp.put(PathMaker.bls_key_file(id), '.', preserve=True)
             await sftp.put(PathMaker.parameters_file(), '.', preserve=True)
 
-    def _generate_config(self, hosts, node_parameters, bench_parameters):
+    def _generate_config(self, hosts, node_parameters, bench_parameters, hosts_rtt_result):
         Print.info('Generating configuration files...')
 
         # Cleanup all local configuration files.
@@ -332,7 +333,7 @@ class Bench:
             addresses = OrderedDict(
                 (x, y) for x, y in zip(names, hosts)
             )
-        committee = Committee.from_address_list(addresses, self.settings.base_port, bench_parameters.faults, bls_pubkeys_g1, bls_pubkeys_g2)
+        committee = Committee.from_address_list(addresses, self.settings.base_port, bench_parameters.faults, bls_pubkeys_g1, bls_pubkeys_g2, hosts_rtt_result)
         committee.print(PathMaker.committee_file())
         node_parameters.print(PathMaker.parameters_file())
         return (committee, names)
@@ -530,6 +531,17 @@ class Bench:
             # the config files to even one node.
             return host, Exception(f'Failed to configure {host} because of {e}')
         
+    async def _rtt_sort(self, host, connection, cmd) -> None:
+        try:
+            async with connection.start_sftp_client() as sftp:
+                # Copy the rtt_sort.py file
+                await sftp.put(PathMaker.rtt_sort_file(), preserve=True)
+            result = await connection.create_process(cmd)
+            # Start the installation script as a background process
+            return host, result
+        except Exception as e:
+            return host, Exception(f'Failed to install on {host} because of {e}')
+    
     async def _run(
         self, 
         hosts, 
@@ -538,16 +550,42 @@ class Bench:
         debug=False, 
         consensus_only=False, 
         update=True,
+        rtt_sort=False
     ):
         hosts_and_connections = await self._try_connect_all(hosts)
         self.hosts_to_connections = { host: connection for host, connection in hosts_and_connections }
 
+        Print.info(f'Running RTT Sort')
+        
+        commands = [
+        'cd /home/ubuntu',
+        # Run the bootstrap script in the background.
+        f"python3 rtt_sort.py '{json.dumps(hosts)}' 2>./rtt_sort.err &"
+        ]
+
+        cmd = ' && '.join(commands)
+        tasks = []
+        
+        for host in hosts:
+            connection = self.hosts_to_connections[host]
+            tasks.append(self._rtt_sort(host, connection, cmd))
+
+        hosts_and_results = await self._gather_and_parse(tasks, 'RTT_sort')
+        hosts_rtt_result = {}
+        for host, result in hosts_and_results:
+            line = [x async for x in result.stdout]
+            hosts_rtt_result[host] = json.loads(line[0])
+            hosts_rtt_result[host].remove(host)
+
         try:
-            (committee, names) = self._generate_config(hosts, node_parameters, bench_parameters)
+            (committee, names) = self._generate_config(hosts, node_parameters, bench_parameters, hosts_rtt_result)
         except SubprocessError as e:
             traceback.print_exc()
             raise BenchError('Failed to configure nodes', e)
+
         
+        return
+    
         names = names[:len(names) - bench_parameters.faults]
         msg = f'Uploading configuration files'
         if update:
@@ -640,5 +678,6 @@ class Bench:
                 debug, 
                 consensus_only, 
                 update,
+                True
             )
         )

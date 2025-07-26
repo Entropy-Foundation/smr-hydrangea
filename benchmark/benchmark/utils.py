@@ -103,6 +103,10 @@ class PathMaker:
     @staticmethod
     def plot_file(name, ext):
         return join(PathMaker.plots_path(), f'{name}.{ext}')
+    
+    @staticmethod
+    def rtt_sort_file():
+        return join('benchmark', 'rtt_sort.py')
 
 
 class Color:

@@ -101,17 +101,16 @@ impl Proposer {
 
     async fn send_proposal(&mut self, proposal: ProposalMessage) {
         info!("Proposing {:?}", proposal);
-        let (names, addresses): (Vec<_>, _) = self
+        let addresses = self
             .committee
             .others_consensus(&self.name)
             .into_iter()
-            .map(|(name, x)| (name, x.consensus_to_consensus))
-            .unzip();
+            .map(|x| (x.consensus_to_consensus)).collect();
 
-        debug!(
-            "Sending to {:?} {:?}. Self is: {}",
-            names, addresses, self.name
-        );
+        // debug!(
+        //     "Sending to {:?} {:?}. Self is: {}",
+        //     names, addresses, self.name
+        // );
 
         let message = bincode::serialize(&ConsensusMessage::Propose(proposal))
             .expect("Failed to serialize block");
