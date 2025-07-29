@@ -838,7 +838,7 @@ impl Core {
 
     async fn process_fallback_recovery_proposal(
         &mut self,
-        p: FallbackRecoveryProposal,
+        mut p: FallbackRecoveryProposal,
     ) -> ConsensusResult<()> {
         debug!("Received Fallback Recovery Proposal {:?}", p);
         // Ensure embedded TC is valid. TODO: Remove panics.
