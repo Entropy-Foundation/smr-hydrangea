@@ -15,7 +15,7 @@ def local(ctx, debug=False, consensus_only=True, aggregate=False):
     ''' Run benchmarks on localhost '''
     bench_params = {
         'faults': 0,
-        'nodes': 15,
+        'nodes': 10,
         'workers': 1,
         'rate': 100_000,
         'tx_size': 512,
@@ -25,10 +25,10 @@ def local(ctx, debug=False, consensus_only=True, aggregate=False):
     }
     node_params = {
         'n': bench_params['nodes'], # Number of nodes
-        'f': 2, #Number of Byzantine parties tolerated
+        'f': 1, #Number of Byzantine parties tolerated
         'c': 2, # Number of crash faults,
-        'k': 4, # a parameter
-        'max_block_size': 10,
+        'k': 2, # a parameter
+        'max_block_size': 100,
         'consensus_only': consensus_only,
         'timeout_delay': 100,  # ms
         'header_size': 512_000,  # bytes
@@ -51,7 +51,7 @@ def local(ctx, debug=False, consensus_only=True, aggregate=False):
 
 
 @task
-def create(ctx, nodes=2):
+def create(ctx, nodes=1):
     ''' Create a testbed'''
     try:
         InstanceManager.make().create_instances(nodes)
@@ -119,7 +119,7 @@ def remote(ctx, burst=50, debug=False, consensus_only=True, update=True, aggrega
     
     bench_params = {
         'faults': 0,
-        'nodes': [20],
+        'nodes': [10],
         'workers': 1,
         'collocate': True,
         'rate': [100_000],
@@ -139,10 +139,10 @@ def remote(ctx, burst=50, debug=False, consensus_only=True, update=True, aggrega
  
     node_params = {
         'n': bench_params['nodes'][0], # Number of nodes
-        'f': 3, #Number of Byzantine parties tolerated
-        'c': 1, # Number of crash faults,
-        'k': 8, # a parameter
-        'max_block_size': 1,
+        'f': 1, #Number of Byzantine parties tolerated
+        'c': 2, # Number of crash faults,
+        'k': 2, # a parameter
+        'max_block_size': 90,
         'consensus_only': consensus_only,
         'timeout_delay': 5_000,  # ms
         'header_size': 1024_000,  # bytes

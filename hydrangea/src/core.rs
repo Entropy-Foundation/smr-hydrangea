@@ -823,7 +823,7 @@ impl Core {
         Ok(())
     }
 
-    async fn process_normal_proposal(&mut self, p: NormalProposal) -> ConsensusResult<()> {
+    async fn process_normal_proposal(&mut self, mut p: NormalProposal) -> ConsensusResult<()> {
         debug!("Received Normal Proposal {:?}", p);
         // Ensure embedded QC is valid. TODO: Remove panics.
         self.handle_qc(&p.qc).await?;
@@ -832,6 +832,7 @@ impl Core {
         //   2. Proposal includes a QC p.block.round - 1 and this QC certifies block.parent.
         //   3. Block is signed by the proposer.
         p.is_well_formed(&self.committee)?;
+        p.block.resize();
         self.process_block(&p.block).await
     }
 
@@ -849,6 +850,7 @@ impl Core {
         //   4. The parent of the included block is the block certified by
         //      the QC with the highest round included in the included TC.
         p.is_well_formed(&self.committee)?;
+        p.block.resize();
         self.process_block(&p.block).await
     }
 

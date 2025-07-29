@@ -28,7 +28,7 @@ pub struct Proposer {
     consensus_only: bool,
     committee: Committee,
     in_progress: HashMap<Round, Vec<CancelHandler>>,
-    last_proposed: Block,
+    last_proposed_round: Round,
     max_block_delay: u64,
     max_block_size: usize,
     rx_mempool: Receiver<Certificate>,
@@ -57,7 +57,7 @@ impl Proposer {
                 consensus_only,
                 committee,
                 in_progress: HashMap::new(),
-                last_proposed: Block::genesis(),
+                last_proposed_round: 0,
                 signature_service,
                 max_block_delay: 2_000,
                 max_block_size,
@@ -127,12 +127,12 @@ impl Proposer {
             .network
             .broadcast(addresses, Bytes::from(message))
             .await;
-        self.in_progress.insert(self.last_proposed.round, handles);
+        self.in_progress.insert(self.last_proposed_round, handles);
     }
 
-    fn record_proposal(&mut self, b: Block) {
-        info!("Created {:?}", b);
-        self.last_proposed = b;
+    fn record_proposal(&mut self, b: &Block) {
+        info!("Created {:?}", *b);
+        self.last_proposed_round = b.round;
     }
 
     async fn make_fallback_proposal(&mut self, tc: TC) -> ProposalMessage {
@@ -152,7 +152,7 @@ impl Proposer {
             self.signature_service.clone(),
         )
         .await;
-        self.record_proposal(b.clone());
+        self.record_proposal(&b);
         ProposalMessage::F(FallbackRecoveryProposal::new(b, tc))
     }
 
@@ -166,7 +166,7 @@ impl Proposer {
             self.signature_service.clone(),
         )
         .await;
-        self.record_proposal(b.clone());
+        self.record_proposal(&b);
         ProposalMessage::N(NormalProposal::new(b, parent_qc))
     }
 

@@ -27,6 +27,7 @@ class GCPError(Exception):
 class InstanceManager:
     INSTANCE_NAME = 'hydrangea-bench'
     PROJECT_ID = 'supra-testnet-417213'
+
 ##################################################################
 
     def __init__(self,settings):
@@ -36,8 +37,6 @@ class InstanceManager:
         self.settings = settings
         for zone in self.settings.zones:
             self.clients[zone] = compute_v1.InstancesClient(credentials=credentials)
-
-
 
     @classmethod
     def make(cls, settings_file='settings.json'):

@@ -69,6 +69,18 @@ impl Block {
         }
         Ok(())
     }
+
+    pub fn resize(&mut self) {
+        self.payload.resize(1, Certificate::default());
+    }
+
+    // pub fn get_block_meta(&self) -> BlockMeta {
+    //     BlockMeta{
+    //         author: self.author,
+    //         parent: self.parent.clone(),
+    //         round: self.round,
+    //     }
+    // }
 }
 
 impl Hash for Block {
@@ -78,9 +90,9 @@ impl Hash for Block {
         hasher.update(self.parent.clone());
         hasher.update(self.round.to_le_bytes());
 
-        for x in &self.payload {
-            hasher.update(&x.id);
-        }
+        // for x in &self.payload {
+        //     hasher.update(&x.id);
+        // }
 
         Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
     }
