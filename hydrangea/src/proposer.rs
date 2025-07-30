@@ -9,6 +9,7 @@ use primary::Certificate;
 use std::collections::HashMap;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration, Instant};
+use std::mem;
 
 #[derive(Debug, Clone)]
 pub enum ProposalTrigger {
@@ -167,6 +168,7 @@ impl Proposer {
         )
         .await;
         self.record_proposal(&b);
+        info!("The size of payload {:?} Bytes", mem::size_of_val(&*b.payload));
         ProposalMessage::N(NormalProposal::new(b, parent_qc))
     }
 
