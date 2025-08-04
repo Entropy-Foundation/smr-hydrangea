@@ -244,12 +244,12 @@ impl Committee {
 
         let me = authorities.get(&name).unwrap();
         let mut rtt_others = Vec::new();
-        for idx in p..(n-1) {
+        for idx in 0..(n-1) {
             rtt_others.push(authorities.get(&me.priority_list[idx as usize]).unwrap().clone());
         }
-        for idx in 0..p {
-            rtt_others.push(authorities.get(&me.priority_list[idx as usize]).unwrap().clone());
-        }
+        // for idx in 0..p {
+        //     rtt_others.push(authorities.get(&me.priority_list[idx as usize]).unwrap().clone());
+        // }
 
 
         let committee = Self {
