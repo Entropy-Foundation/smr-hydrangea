@@ -26,8 +26,8 @@ def local(ctx, debug=False, consensus_only=True, aggregate=False):
     node_params = {
         'n': bench_params['nodes'], # Number of nodes
         'f': 2, #Number of Byzantine parties tolerated
-        'c': 4, # Number of crash faults,
-        'k': 0, # a parameter
+        'c': 2, # Number of crash faults,
+        'k': 4, # a parameter
         'max_block_size': 10,
         'consensus_only': consensus_only,
         'timeout_delay': 1000,  # ms
@@ -51,7 +51,7 @@ def local(ctx, debug=False, consensus_only=True, aggregate=False):
 
 
 @task
-def create(ctx, nodes=4):
+def create(ctx, nodes=1):
     ''' Create a testbed'''
     try:
         InstanceManager.make().create_instances(nodes)
@@ -114,19 +114,19 @@ def create_firewall(ctx):
 
 
 @task
-def remote(ctx, burst=50, debug=False, consensus_only=True, update=True, aggregate=False):
+def remote(ctx, block_size=50, debug=False, consensus_only=True, update=True, aggregate=False):
     ''' Run benchmarks on GCP '''
     
     bench_params = {
         'faults': 0,
-        'nodes': [20],
+        'nodes': [100],
         'workers': 1,
         'collocate': True,
         'rate': [100_000],
         'tx_size': 512,
-        'duration': 60,
+        'duration': 120,
         'runs': 1,
-        'burst': [burst],
+        'burst': [0],
     }
 
     nodes = bench_params['nodes'][0]
@@ -139,10 +139,10 @@ def remote(ctx, burst=50, debug=False, consensus_only=True, update=True, aggrega
  
     node_params = {
         'n': bench_params['nodes'][0], # Number of nodes
-        'f': 3, #Number of Byzantine parties tolerated
-        'c': 5, # Number of crash faults,
-        'k': 0, # a parameter
-        'max_block_size': 10,
+        'f': 19, #Number of Byzantine parties tolerated
+        'c': 20, # Number of crash faults,
+        'k': 2, # a parameter
+        'max_block_size': block_size,
         'consensus_only': consensus_only,
         'timeout_delay': 5_000,  # ms
         'header_size': 1024_000,  # bytes

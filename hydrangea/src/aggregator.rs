@@ -3,9 +3,7 @@ use crate::error::ConsensusResult;
 use crate::messages::{Timeout, Vote, VoteType, QC, TC};
 use blsttc::{PublicKeyShareG2, SignatureShareG1};
 use config::{Committee, Stake};
-use crypto::{
-    aggregate_sign, remove_pubkeys, Digest, Hash, PublicKey, Signature,
-};
+use crypto::{aggregate_sign, remove_pubkeys, Digest, Hash, PublicKey, Signature};
 use log::info;
 use std::collections::{HashMap, HashSet};
 

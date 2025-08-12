@@ -245,7 +245,7 @@ impl Committee {
             k,
             quorum_threshold,
             slow_commit_threshold,
-            view_change_threshold
+            view_change_threshold,
         };
         committee
     }
