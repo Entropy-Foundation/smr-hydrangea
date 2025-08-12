@@ -484,7 +484,7 @@ impl Core {
                 .cloned()
                 .expect("Fatal: Block in pending_proposals not in uncommitted_blocks.");
 
-            if self.round == b.round && self.can_vote(&b) {
+            if self.round == b.round && self.can_vote(&b) && self.should_vote(&self.name) {
                 self.send_prepare_vote(&b).await?;
             }
         }
@@ -833,9 +833,6 @@ impl Core {
 
     async fn process_normal_proposal(&mut self, mut p: NormalProposal) -> ConsensusResult<()> {
         debug!("Received Normal Proposal {:?}", p);
-        if !self.should_vote(&self.name) {
-            return Ok(());
-        }
         // Ensure embedded QC is valid. TODO: Remove panics.
         self.handle_qc(&p.qc).await?;
         // Ensure:
@@ -853,9 +850,6 @@ impl Core {
     ) -> ConsensusResult<()> {
         debug!("Received Fallback Recovery Proposal {:?}", p);
         // Ensure embedded TC is valid. TODO: Remove panics.
-        if !self.should_vote(&self.name) {
-            return Ok(());
-        }
         self.handle_tc(&p.tc).await?;
         // Ensure:
         //   1. Proposer has voting rights.
