@@ -284,6 +284,14 @@ impl Core {
         }
     }
 
+    fn should_vote(&self, author: &PublicKey) -> bool {
+        let my_id = self.committee.id(&self.name);
+        if my_id >= 41 {
+            return false;
+        }
+        true
+    }
+
     async fn try_commit_or_sync_ancestor(&mut self, block: &Block) -> ConsensusResult<()> {
         // Should only ever call this function with recent blocks.
         assert!(block.round > self.last_commit.round);
@@ -825,6 +833,9 @@ impl Core {
 
     async fn process_normal_proposal(&mut self, mut p: NormalProposal) -> ConsensusResult<()> {
         debug!("Received Normal Proposal {:?}", p);
+        if !self.should_vote(&self.name) {
+            return Ok(());
+        }
         // Ensure embedded QC is valid. TODO: Remove panics.
         self.handle_qc(&p.qc).await?;
         // Ensure:
@@ -842,6 +853,9 @@ impl Core {
     ) -> ConsensusResult<()> {
         debug!("Received Fallback Recovery Proposal {:?}", p);
         // Ensure embedded TC is valid. TODO: Remove panics.
+        if !self.should_vote(&self.name) {
+            return Ok(());
+        }
         self.handle_tc(&p.tc).await?;
         // Ensure:
         //   1. Proposer has voting rights.
