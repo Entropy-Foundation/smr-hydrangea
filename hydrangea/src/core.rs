@@ -271,6 +271,14 @@ impl Core {
         }
     }
 
+    fn should_vote(&self, author: &PublicKey) -> bool {
+        let my_id = self.committee.id(&self.name);
+        if my_id >= 41 {
+            return false;
+        }
+        true
+    }
+
     async fn try_commit_or_sync_ancestor(&mut self, block: &Block) -> ConsensusResult<()> {
         // Should only ever call this function with recent blocks.
         assert!(block.round > self.last_commit.round);
@@ -463,7 +471,7 @@ impl Core {
                 .cloned()
                 .expect("Fatal: Block in pending_proposals not in uncommitted_blocks.");
 
-            if self.round == b.round && self.can_vote(&b) {
+            if self.round == b.round && self.can_vote(&b) && self.should_vote(&self.name) {
                 self.send_prepare_vote(&b).await?;
             }
         }
