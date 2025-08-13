@@ -51,7 +51,7 @@ def local(ctx, debug=False, consensus_only=True, aggregate=False):
 
 
 @task
-def create(ctx, nodes=10):
+def create(ctx, nodes=5):
     ''' Create a testbed'''
     try:
         InstanceManager.make().create_instances(nodes)
@@ -119,7 +119,7 @@ def remote(ctx, block_size=10, debug=False, consensus_only=True, update=True, ag
     
     bench_params = {
         'faults': 0,
-        'nodes': [100],
+        'nodes': [50],
         'workers': 1,
         'collocate': True,
         'rate': [100_000],
@@ -139,8 +139,8 @@ def remote(ctx, block_size=10, debug=False, consensus_only=True, update=True, ag
  
     node_params = {
         'n': bench_params['nodes'][0], # Number of nodes
-        'f': 19, #Number of Byzantine parties tolerated
-        'c': 20, # Number of crash faults,
+        'f': 9, #Number of Byzantine parties tolerated
+        'c': 10, # Number of crash faults,
         'k': 2, # a parameter
         'max_block_size': block_size,
         'consensus_only': consensus_only,
