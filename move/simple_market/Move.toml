@@ -1,0 +1,12 @@
+[package]
+name = "simple_market"
+version = "0.0.1"
+
+[addresses]
+simple_market = "0x17498d87be6df5a9dd749379fd3e80a05213ddd33951a5913dda4e60cd2b9bb8"
+market_signer = "0xaf799e6721b94bfc96aedec57aa2ede556e057460fa51916e42992bc7540f302"
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "main", subdir = "aptos-move/framework/aptos-framework" }
+AptosStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "main", subdir = "aptos-move/framework/aptos-stdlib" }
+AptosExperimental = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "main", subdir = "aptos-move/framework/aptos-experimental" }

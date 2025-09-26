@@ -1,6 +1,7 @@
 pub mod accounts;
 pub mod database;
 pub mod executor;
+pub mod scenarios;
 pub mod transaction_builder;
 
 pub use accounts::LocalAccount;
