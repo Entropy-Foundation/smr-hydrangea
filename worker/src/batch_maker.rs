@@ -1,6 +1,7 @@
 // Copyright(C) Facebook, Inc. and its affiliates.
 use crate::quorum_waiter::QuorumWaiterMessage;
 use crate::worker::WorkerMessage;
+use aptos_types::transaction::SignedTransaction;
 use bytes::Bytes;
 #[cfg(feature = "benchmark")]
 use crypto::Digest;
@@ -20,7 +21,7 @@ use tokio::time::{sleep, Duration, Instant};
 // #[path = "tests/batch_maker_tests.rs"]
 // pub mod batch_maker_tests;
 
-pub type Transaction = Vec<u8>;
+pub type Transaction = SignedTransaction;
 pub type Batch = Vec<Transaction>;
 
 /// Assemble clients transactions into batches.
@@ -76,7 +77,7 @@ impl BatchMaker {
             tokio::select! {
                 // Assemble client transactions into batches of preset size.
                 Some(transaction) = self.rx_transaction.recv() => {
-                    self.current_batch_size += transaction.len();
+                    self.current_batch_size += serialized_len(&transaction);
                     self.current_batch.push(transaction);
                     if self.current_batch_size >= self.batch_size {
                         self.seal().await;
@@ -105,12 +106,7 @@ impl BatchMaker {
 
         // Look for sample txs (they all start with 0) and gather their txs id (the next 8 bytes).
         #[cfg(feature = "benchmark")]
-        let tx_ids: Vec<_> = self
-            .current_batch
-            .iter()
-            .filter(|tx| tx[0] == 0u8 && tx.len() > 8)
-            .filter_map(|tx| tx[1..9].try_into().ok())
-            .collect();
+        let tx_ids: Vec<_> = self.current_batch.iter().filter_map(sample_tx_id).collect();
 
         // Serialize the batch.
         self.current_batch_size = 0;
@@ -154,4 +150,19 @@ impl BatchMaker {
             .await
             .expect("Failed to deliver batch");
     }
+}
+
+fn serialized_len(tx: &Transaction) -> usize {
+    bcs::serialized_size(tx).expect("failed to compute serialized transaction size") as usize
+}
+
+#[cfg(feature = "benchmark")]
+fn sample_tx_id(tx: &Transaction) -> Option<[u8; 8]> {
+    let bytes = bcs::to_bytes(tx).ok()?;
+    if bytes.first().copied() != Some(0u8) || bytes.len() < 9 {
+        return None;
+    }
+    let mut id = [0u8; 8];
+    id.copy_from_slice(&bytes[1..9]);
+    Some(id)
 }

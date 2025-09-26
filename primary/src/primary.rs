@@ -3,14 +3,13 @@ use crate::core::Core;
 use crate::error::DagError;
 use crate::garbage_collector::GarbageCollector;
 // use crate::header_waiter::HeaderWaiter;
-// use crate::helper::Helper;
+use crate::helper::Helper;
 use crate::messages::{Certificate, Header, Vote};
 use crate::payload_receiver::PayloadReceiver;
 use crate::proposer::Proposer;
 // use crate::synchronizer::Synchronizer;
 use crate::worker::Worker;
 use async_trait::async_trait;
-use blsttc::{PublicKeyShareG1, PublicKeyShareG2};
 use bytes::Bytes;
 use config::{Committee, Parameters, WorkerId};
 use crypto::{BlsSignatureService, Digest, PublicKey, SignatureService};
@@ -62,8 +61,6 @@ pub struct Primary;
 impl Primary {
     pub fn spawn(
         name: PublicKey,
-        name_bls_g1: PublicKeyShareG1,
-        name_bls_g2: PublicKeyShareG2,
         committee: Committee,
         parameters: Parameters,
         signature_service: SignatureService,
@@ -72,12 +69,11 @@ impl Primary {
         tx_consensus: Sender<Certificate>,
         rx_consensus: Receiver<Certificate>,
     ) {
-        let (tx_others_digests, rx_others_digests) = channel(CHANNEL_CAPACITY);
+        let (_tx_others_digests, rx_others_digests) = channel(CHANNEL_CAPACITY);
         let (tx_our_digests, rx_our_digests) = channel(CHANNEL_CAPACITY);
-        let (tx_parents, rx_parents) = channel(CHANNEL_CAPACITY);
         let (tx_headers, rx_headers) = channel(CHANNEL_CAPACITY);
         // let (tx_sync_headers, rx_sync_headers) = channel(CHANNEL_CAPACITY);
-        let (tx_headers_loopback, rx_headers_loopback) = channel(CHANNEL_CAPACITY);
+        let (_tx_headers_loopback, rx_headers_loopback) = channel(CHANNEL_CAPACITY);
         let (tx_certificates_loopback, rx_certificates_loopback) = channel(CHANNEL_CAPACITY);
         let (tx_primary_messages, rx_primary_messages) = channel(CHANNEL_CAPACITY);
         let (tx_cert_requests, rx_cert_requests) = channel(CHANNEL_CAPACITY);
@@ -120,7 +116,7 @@ impl Primary {
         //     /* handler */
         //     WorkerReceiverHandler {
         //         tx_our_digests,
-        //         tx_others_digests,
+        //         _tx_others_digests,
         //     },
         // );
         info!(
@@ -145,8 +141,6 @@ impl Primary {
         // The `Core` receives and handles headers, votes, and certificates from the other primaries.
         Core::spawn(
             name,
-            name_bls_g1,
-            name_bls_g2,
             committee.clone(),
             store.clone(),
             // synchronizer,
@@ -158,7 +152,6 @@ impl Primary {
             /* rx_certificate_waiter */ rx_certificates_loopback,
             /* rx_proposer */ rx_headers,
             tx_consensus,
-            /* tx_proposer */ tx_parents,
             tx_primary_messages,
         );
 
@@ -197,13 +190,12 @@ impl Primary {
             signature_service,
             parameters.header_size,
             parameters.max_header_delay,
-            /* rx_core */ rx_parents,
             /* rx_workers */ rx_our_digests,
             /* tx_core */ tx_headers,
         );
 
         // The `Helper` is dedicated to reply to certificates requests from other primaries.
-        // Helper::spawn(committee.clone(), store, rx_cert_requests);
+        Helper::spawn(committee.clone(), store, rx_cert_requests);
 
         // NOTE: This log entry is used to compute performance.
         info!(
@@ -250,6 +242,7 @@ impl MessageHandler for PrimaryReceiverHandler {
 
 /// Defines how the network receiver handles incoming workers messages.
 #[derive(Clone)]
+#[allow(dead_code)]
 struct WorkerReceiverHandler {
     tx_our_digests: Sender<(Digest, WorkerId)>,
     tx_others_digests: Sender<(Digest, WorkerId)>,

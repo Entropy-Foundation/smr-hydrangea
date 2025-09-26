@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use config::{Committee, Parameters, WorkerId};
 use crypto::{Digest, PublicKey};
-use log::info;
+use log::{info, warn};
 use network::{MessageHandler, Receiver, Writer};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -15,10 +15,6 @@ use tokio::sync::mpsc::{channel, Sender};
 
 /// The default channel capacity for each channel of the worker.
 pub const CHANNEL_CAPACITY: usize = 1_000;
-
-/// The primary round number.
-// TODO: Move to the primary.
-pub type Round = u64;
 
 /// The message exchanged between workers.
 #[derive(Debug, Serialize, Deserialize)]
@@ -115,9 +111,16 @@ struct TxReceiverHandler {
 #[async_trait]
 impl MessageHandler for TxReceiverHandler {
     async fn dispatch(&self, _writer: &mut Writer, message: Bytes) -> Result<(), Box<dyn Error>> {
-        // Send the transaction to the batch maker.
+        // Parse the transaction and forward it to the batch maker.
+        let txn: Transaction = match bcs::from_bytes(message.as_ref()) {
+            Ok(txn) => txn,
+            Err(e) => {
+                warn!("Failed to decode incoming transaction: {}", e);
+                return Ok(());
+            }
+        };
         self.tx_batch_maker
-            .send(message.to_vec())
+            .send(txn)
             .await
             .expect("Failed to send transaction");
 

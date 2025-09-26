@@ -3,67 +3,46 @@ use config::{Committee, LeaderElectorKind};
 use crypto::PublicKey;
 use std::collections::{HashMap, VecDeque};
 
-// Note: There is likely a better way to do the below. My Rust needs work.
+enum LeaderElectorInner {
+    Simple(SimpleLeaderElector),
+    Fair(DeterministicFairSuccessionLeaderElector),
+    Failure(FailureSimulationLeaderElector),
+}
+
 /// Factory for the various leader electors to enable instantiation at runtime.
 pub struct LeaderElector {
-    // maybe_fair_succession: Option<DeterministicFairSuccessionLeaderElector>,
-    // maybe_failure: Option<FailureSimulationLeaderElector>,
-    simple: SimpleLeaderElector,
+    inner: LeaderElectorInner,
 }
 
 impl LeaderElector {
     pub fn new(kind: LeaderElectorKind, committee: Committee) -> Self {
-        // let (maybe_failure, maybe_fair_succession) = match kind {
-        //     LeaderElectorKind::FailureBestCase => (
-        //         Some(FailureSimulationLeaderElector::new(
-        //             committee,
-        //             FailureScenario::BEST,
-        //         )),
-        //         None,
-        //     ),
-        //     LeaderElectorKind::FailureMidCase => (
-        //         Some(FailureSimulationLeaderElector::new(
-        //             committee,
-        //             FailureScenario::MID,
-        //         )),
-        //         None,
-        //     ),
-        //     LeaderElectorKind::FailureWorstCase => (
-        //         Some(FailureSimulationLeaderElector::new(
-        //             committee,
-        //             FailureScenario::WORST,
-        //         )),
-        //         None,
-        //     ),
-        //     LeaderElectorKind::FairSuccession => (
-        //         None,
-        //         Some(DeterministicFairSuccessionLeaderElector::new(committee)),
-        //     ),
-        //     LeaderElectorKind::Simple => (
-        //         None,
-        //         Some(SimpleLeaderElector::new(committee)),
-        //     )
-        // };
+        let inner = match kind {
+            LeaderElectorKind::Simple => {
+                LeaderElectorInner::Simple(SimpleLeaderElector::new(committee))
+            }
+            LeaderElectorKind::FairSuccession => LeaderElectorInner::Fair(
+                DeterministicFairSuccessionLeaderElector::new(committee),
+            ),
+            LeaderElectorKind::FailureBestCase => LeaderElectorInner::Failure(
+                FailureSimulationLeaderElector::new(committee, FailureScenario::BEST),
+            ),
+            LeaderElectorKind::FailureMidCase => LeaderElectorInner::Failure(
+                FailureSimulationLeaderElector::new(committee, FailureScenario::MID),
+            ),
+            LeaderElectorKind::FailureWorstCase => LeaderElectorInner::Failure(
+                FailureSimulationLeaderElector::new(committee, FailureScenario::WORST),
+            ),
+        };
 
-        // Self {
-        //     maybe_fair_succession,
-        //     maybe_failure,
-        // }
-        Self {
-            simple: SimpleLeaderElector::new(committee),
-        }
+        Self { inner }
     }
 
     pub fn get_leader(&self, round: Round) -> PublicKey {
-        // match (
-        //     self.maybe_failure.clone(),
-        //     self.maybe_fair_succession.clone(),
-        // ) {
-        //     (Some(l), None) => l.get_leader(round),
-        //     (None, Some(l)) => l.get_leader(round),
-        //     _ => panic!("Unreachable by construction."),
-        // }
-        self.simple.get_leader(round)
+        match &self.inner {
+            LeaderElectorInner::Simple(elector) => elector.get_leader(round),
+            LeaderElectorInner::Fair(elector) => elector.get_leader(round),
+            LeaderElectorInner::Failure(elector) => elector.get_leader(round),
+        }
     }
 }
 

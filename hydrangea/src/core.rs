@@ -58,7 +58,6 @@ pub struct Core {
     qc_syncs: HashMap<PublicKey, Instant>,
     round: Round,
     rx_proposer: Receiver<ProposalMessage>,
-    tx_message: Sender<ConsensusMessage>,
     rx_message: Receiver<ConsensusMessage>,
     rx_synchronizer: Receiver<Block>,
     signature_service: SignatureService,
@@ -95,7 +94,6 @@ impl Core {
         mempool_driver: MempoolDriver,
         synchronizer: Synchronizer,
         timeout_delay: u64,
-        tx_message: Sender<ConsensusMessage>,
         rx_message: Receiver<ConsensusMessage>,
         rx_proposer: Receiver<ProposalMessage>,
         rx_synchronizer: Receiver<Block>,
@@ -139,7 +137,6 @@ impl Core {
                 qc_syncs: HashMap::new(),
                 round: 1,
                 rx_proposer,
-                tx_message,
                 rx_message,
                 rx_synchronizer,
                 signature_service,
@@ -246,7 +243,7 @@ impl Core {
 
         // Trace the chain of ancestors back to our most recently committed block.
         loop {
-            let maybe_parent = 
+            let maybe_parent =
                 // Check the in-memory index to avoid IO.
                 match self.uncommitted_blocks.get(&b.parent)
                 {
@@ -310,7 +307,7 @@ impl Core {
         // with Timeouts for old rounds.
         let rate_limited = match self.qc_syncs.get(recipient) {
             // We expect to receive at most one Timeout message per timeout_delay per peer.
-            Some(synced_at) => synced_at.elapsed().as_millis() < self.timeout_delay.into(),
+            Some(synced_at) => synced_at.elapsed().as_millis() < u128::from(self.timeout_delay),
             None => false,
         };
 
@@ -410,20 +407,18 @@ impl Core {
                 let payload = committing.payload.clone();
                 // Send the payload to the committer.
                 self.tx_commit
-                    .send(payload)
+                    .send(payload.clone())
                     .await
                     .expect("Failed to send payload");
-                //     let payload = committing.payload.clone();
+                // Output the block to the top-level application.
+                if let Err(e) = self.tx_output.send(committing.clone()).await {
+                    warn!("Failed to send block through the output channel: {}", e);
+                }
 
-                //     // Output the block to the top-level application.
-                //     if let Err(e) = self.tx_output.send(committing).await {
-                //         warn!("Failed to send block through the output channel: {}", e);
-                //     }
-
-                //     // Clean up the mempool.
-                //     // TODO: Ensure that this also cleans up payloads for blocks from
-                //     // previous rounds that can never be committed.
-                //     self.mempool_driver.cleanup(payload).await;
+                // Clean up the mempool.
+                // TODO: Ensure that this also cleans up payloads for blocks from
+                // previous rounds that can never be committed.
+                self.mempool_driver.cleanup(payload).await;
             }
         }
 
@@ -805,7 +800,7 @@ impl Core {
         // so could just remove all non-consensus-only features.
         if !self.consensus_only {
             // Check that the payload certificates are valid.
-            // self.mempool_driver.verify(block).await?;
+            self.mempool_driver.verify(block).await?;
         }
 
         // Block has a valid payload.

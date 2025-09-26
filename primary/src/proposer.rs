@@ -2,11 +2,9 @@
 use crate::batch_maker::Transaction;
 use crate::messages::Header;
 use crate::primary::Round;
-use crypto::{Digest, PublicKey, SignatureService};
+use crypto::{PublicKey, SignatureService};
 #[cfg(feature = "benchmark")]
 use log::info;
-#[cfg(feature = "benchmark")]
-use std::convert::TryInto as _;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration, Instant};
 
@@ -24,8 +22,6 @@ pub struct Proposer {
     header_size: usize,
     /// The maximum delay to wait for batches' digests.
     max_header_delay: u64,
-    /// Receives the parents to include in the next header (along with their round number).
-    rx_core: Receiver<(Vec<Digest>, Round)>,
     /// Receives the batches' digests from our workers.
     rx_workers: Receiver<Vec<Transaction>>,
     /// Sends newly created headers to the `Core`.
@@ -45,7 +41,6 @@ impl Proposer {
         signature_service: SignatureService,
         header_size: usize,
         max_header_delay: u64,
-        rx_core: Receiver<(Vec<Digest>, Round)>,
         rx_workers: Receiver<Vec<Transaction>>,
         tx_core: Sender<Header>,
     ) {
@@ -55,7 +50,6 @@ impl Proposer {
                 signature_service,
                 header_size,
                 max_header_delay,
-                rx_core,
                 rx_workers,
                 tx_core,
                 round: 1,
@@ -83,13 +77,7 @@ impl Proposer {
             info!("Header {:?} contains {} B", header.id, self.payload_size);
 
             // NOTE: This log entry is used to compute performance.
-            let tx_ids: Vec<_> = header
-                .payload
-                .clone()
-                .iter()
-                .filter(|tx| tx[0] == 0u8 && tx.len() > 8)
-                .filter_map(|tx| tx[1..9].try_into().ok())
-                .collect();
+            let tx_ids: Vec<_> = header.payload.iter().filter_map(sample_tx_id).collect();
             for id in tx_ids {
                 info!(
                     "Header {:?} contains sample tx {}",
@@ -132,7 +120,8 @@ impl Proposer {
 
             tokio::select! {
                 Some(transactions) = self.rx_workers.recv() => {
-                    self.payload_size += transactions.iter().map(|txn| txn.len()).sum::<usize>();
+                    self.payload_size +=
+                        transactions.iter().map(serialized_len).sum::<usize>();
                     self.txns.extend(transactions);
                 }
                 () = &mut timer => {
@@ -142,4 +131,19 @@ impl Proposer {
             }
         }
     }
+}
+
+fn serialized_len(tx: &Transaction) -> usize {
+    bcs::serialized_size(tx).expect("failed to compute serialized transaction size") as usize
+}
+
+#[cfg(feature = "benchmark")]
+fn sample_tx_id(tx: &Transaction) -> Option<[u8; 8]> {
+    let bytes = bcs::to_bytes(tx).ok()?;
+    if bytes.first().copied() != Some(0u8) || bytes.len() < 9 {
+        return None;
+    }
+    let mut id = [0u8; 8];
+    id.copy_from_slice(&bytes[1..9]);
+    Some(id)
 }

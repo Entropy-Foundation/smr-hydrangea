@@ -5,7 +5,6 @@ use crate::messages::{Certificate, Header, Vote};
 use crate::primary::{PrimaryMessage, Round};
 // use crate::synchronizer::Synchronizer;
 use async_recursion::async_recursion;
-use blsttc::{PublicKeyShareG1, PublicKeyShareG2};
 use bytes::Bytes;
 use config::Committee;
 use crypto::Hash as _;
@@ -29,8 +28,6 @@ use tokio::sync::mpsc::{Receiver, Sender};
 pub struct Core {
     /// The public key of this primary.
     name: PublicKey,
-    name_bls_g1: PublicKeyShareG1,
-    name_bls_g2: PublicKeyShareG2,
     /// The committee information.
     committee: Committee,
     /// The persistent storage.
@@ -54,8 +51,6 @@ pub struct Core {
     rx_proposer: Receiver<Header>,
     /// Output all certificates to the consensus layer.
     tx_consensus: Sender<Certificate>,
-    /// Send valid a quorum of certificates' ids to the `Proposer` (along with their round).
-    tx_proposer: Sender<(Vec<Digest>, Round)>,
     /// The last garbage collected round.
     gc_round: Round,
     /// The authors of the last voted headers.
@@ -74,8 +69,6 @@ impl Core {
     #[allow(clippy::too_many_arguments)]
     pub fn spawn(
         name: PublicKey,
-        name_bls_g1: PublicKeyShareG1,
-        name_bls_g2: PublicKeyShareG2,
         committee: Committee,
         store: Store,
         // synchronizer: Synchronizer,
@@ -87,14 +80,11 @@ impl Core {
         rx_certificate_waiter: Receiver<Certificate>,
         rx_proposer: Receiver<Header>,
         tx_consensus: Sender<Certificate>,
-        tx_proposer: Sender<(Vec<Digest>, Round)>,
         tx_primaries: Sender<PrimaryMessage>,
     ) {
         tokio::spawn(async move {
             Self {
                 name,
-                name_bls_g1,
-                name_bls_g2,
                 committee,
                 store,
                 // synchronizer,
@@ -106,7 +96,6 @@ impl Core {
                 rx_certificate_waiter,
                 rx_proposer,
                 tx_consensus,
-                tx_proposer,
                 gc_round: 0,
                 last_voted: HashMap::with_capacity(2 * gc_depth as usize),
                 network: ReliableSender::new(),

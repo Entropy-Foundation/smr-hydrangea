@@ -2,7 +2,7 @@ use crate::batch_maker::Transaction;
 // Copyright(C) Facebook, Inc. and its affiliates.
 use crate::error::{DagError, DagResult};
 use crate::primary::Round;
-use blsttc::{PublicKeyShareG2, SignatureShareG1};
+use blsttc::SignatureShareG1;
 use config::Committee;
 use crypto::{
     combine_key_from_ids, BlsSignatureService, Digest, Hash, PublicKey, Signature, SignatureService,
@@ -66,7 +66,9 @@ impl Hash for Header {
         hasher.update(&self.author);
         hasher.update(self.round.to_le_bytes());
         for x in &self.payload {
-            hasher.update(x);
+            let bytes =
+                bcs::to_bytes(x).expect("failed to serialize transaction while hashing header");
+            hasher.update(bytes);
         }
         Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
     }
@@ -116,7 +118,6 @@ impl Vote {
             committee.stake(&self.author) > 0,
             DagError::UnknownAuthority(self.author)
         );
-        let author_bls_key_g1 = committee.get_bls_public_g1(&self.author);
         // Check the signature.
         // self.signature
         //     .verify_with_nizk(&self.digest().0, &author_bls_key_g1, &self.zkp)

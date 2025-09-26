@@ -120,7 +120,6 @@ impl Consensus {
             mempool_driver,
             synchronizer,
             parameters.timeout_delay,
-            tx_consensus,
             /* rx_message */ rx_consensus,
             rx_proposer_core,
             rx_sync_core,
@@ -131,7 +130,7 @@ impl Consensus {
 
         if !parameters.consensus_only {
             // Commits the mempool certificates and their sub-dag.
-            Committer::spawn(rx_commit);
+            Committer::spawn(store.clone(), rx_commit);
         }
 
         // Spawn the block proposer.

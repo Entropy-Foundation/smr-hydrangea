@@ -5,7 +5,7 @@ mod aggregators;
 mod core;
 mod garbage_collector;
 // mod header_waiter;
-// mod helper;
+mod helper;
 mod messages;
 mod payload_receiver;
 mod primary;

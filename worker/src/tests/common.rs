@@ -1,6 +1,8 @@
 // Copyright(C) Facebook, Inc. and its affiliates.
 use crate::batch_maker::{Batch, Transaction};
 use crate::worker::WorkerMessage;
+use aptos_executor::{transaction_builder::apt_transfer, LocalAccount};
+use aptos_types::chain_id::ChainId;
 use bytes::Bytes;
 use config::{Authority, Committee, PrimaryAddresses, WorkerAddresses};
 use crypto::{generate_keypair, Digest, PublicKey, SecretKey};
@@ -85,7 +87,10 @@ pub fn committee_with_base_port(base_port: u16) -> Committee {
 
 // Fixture
 pub fn transaction() -> Transaction {
-    vec![0; 100]
+    let mut sender = LocalAccount::generate(1).expect("failed to build test account");
+    let recipient = LocalAccount::generate(2).expect("failed to build test account");
+    apt_transfer(&mut sender, recipient.address, 1, ChainId::test())
+        .expect("failed to build transfer transaction")
 }
 
 // Fixture

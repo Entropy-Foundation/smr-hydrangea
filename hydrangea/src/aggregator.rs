@@ -112,6 +112,7 @@ impl QCMaker {
         let author = vote.author;
         let author_bls_g2 = committee.get_bls_public_g2(&vote.author);
         if self.is_valid(&vote) {
+            vote.is_well_formed(committee)?;
             // Verify the signature and voting rights before storing to prevent DoS
             // by unauthorised nodes. Verification is done after membership check on
             // self.used to prevent authorised but Byzantine nodes from draining compute

@@ -248,9 +248,16 @@ struct TxReceiverHandler {
 #[async_trait]
 impl MessageHandler for TxReceiverHandler {
     async fn dispatch(&self, _writer: &mut Writer, message: Bytes) -> Result<(), Box<dyn Error>> {
-        // Send the transaction to the batch maker.
+        // Deserialize the transaction before forwarding to the batch maker.
+        let txn: Transaction = match bcs::from_bytes(message.as_ref()) {
+            Ok(txn) => txn,
+            Err(e) => {
+                warn!("Failed to decode incoming transaction: {}", e);
+                return Ok(());
+            }
+        };
         self.tx_batch_maker
-            .send(message.to_vec())
+            .send(txn)
             .await
             .expect("Failed to send transaction");
 

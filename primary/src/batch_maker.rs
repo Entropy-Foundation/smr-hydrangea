@@ -1,8 +1,9 @@
+use aptos_types::transaction::SignedTransaction;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::time::{sleep, Duration, Instant};
 
-pub type Transaction = Vec<u8>;
+pub type Transaction = SignedTransaction;
 pub type Batch = Vec<Transaction>;
 
 /// Assemble clients transactions into batches.
@@ -50,7 +51,7 @@ impl BatchMaker {
             tokio::select! {
                 // Assemble client transactions into batches of preset size.
                 Some(transaction) = self.rx_transaction.recv() => {
-                    self.current_batch_size += transaction.len();
+                    self.current_batch_size += serialized_len(&transaction);
                     self.current_batch.push(transaction);
                     if self.current_batch_size >= self.batch_size {
                         self.seal().await;
@@ -75,9 +76,14 @@ impl BatchMaker {
     /// Seal and broadcast the current batch.
     async fn seal(&mut self) {
         let batch: Vec<Transaction> = self.current_batch.drain(..).collect();
+        self.current_batch_size = 0;
         self.tx_digests
             .send(batch)
             .await
             .expect("Failed to send digest");
     }
+}
+
+fn serialized_len(tx: &Transaction) -> usize {
+    bcs::serialized_size(tx).expect("failed to compute serialized size for transaction") as usize
 }

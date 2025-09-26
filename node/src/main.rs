@@ -7,6 +7,7 @@ use config::{BlsKeyPair, Comm, Committee, KeyPair, Parameters};
 use crypto::{BlsSignatureService, SignatureService};
 use env_logger::Env;
 use hydrangea::{Block, Consensus};
+use log::debug;
 use primary::Primary;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver};
@@ -110,8 +111,6 @@ async fn run(matches: &ArgMatches<'_>) -> Result<()> {
     let bls_keypair =
         BlsKeyPair::import(bls_key_file).context("Failed to load the node's keypair")?;
     let name = ed_keypair.name;
-    let name_bls_g1 = bls_keypair.nameg1;
-    let name_bls_g2 = bls_keypair.nameg2;
     let comm = Comm::import(committee_file).context("Failed to load the committee information")?;
 
     // Load default parameters if none are specified.
@@ -149,8 +148,6 @@ async fn run(matches: &ArgMatches<'_>) -> Result<()> {
             if !parameters.consensus_only {
                 Primary::spawn(
                     name,
-                    name_bls_g1,
-                    name_bls_g2,
                     committee.clone(),
                     parameters.clone(),
                     signature_service.clone(),

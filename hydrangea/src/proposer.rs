@@ -78,7 +78,7 @@ impl Proposer {
     // Such pending txs should be those included in blocks that have been proposed/voted on
     // but have not yet satisfied the commit rule. Txs should only be removed from the Proposer
     // once they have been committed.
-    fn get_payload(&mut self, r: Round) -> Vec<Certificate> {
+    fn get_payload(&mut self) -> Vec<Certificate> {
         if self.consensus_only {
             let mut payload = Vec::new();
 
@@ -147,7 +147,7 @@ impl Proposer {
         let b = Block::new(
             self.name,
             safe_blk_hash,
-            self.get_payload(r),
+            self.get_payload(),
             r,
             self.signature_service.clone(),
         )
@@ -161,7 +161,7 @@ impl Proposer {
         let b = Block::new(
             self.name,
             parent_qc.blk_hash.clone(),
-            self.get_payload(r),
+            self.get_payload(),
             r,
             self.signature_service.clone(),
         )

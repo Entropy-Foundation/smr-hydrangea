@@ -1,13 +1,14 @@
 // Copyright(C) Facebook, Inc. and its affiliates.
 use anyhow::{Context, Result};
-use bytes::BufMut as _;
-use bytes::BytesMut;
+use aptos_executor::{transaction_builder::apt_transfer, LocalAccount};
+use aptos_types::chain_id::ChainId;
+use bytes::Bytes;
 use clap::{crate_name, crate_version, App, AppSettings};
 use env_logger::Env;
 use futures::future::join_all;
 use futures::sink::SinkExt as _;
 use log::{info, warn};
-use rand::Rng;
+use std::cmp::max;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
 use tokio::time::{interval, sleep, Duration, Instant};
@@ -61,17 +62,44 @@ async fn main() -> Result<()> {
     info!("Node address: {}", target);
 
     // NOTE: This log entry is used to compute performance.
-    info!("Transactions size: {} B", size);
+    info!("Requested transaction size: {} B", size);
 
     // NOTE: This log entry is used to compute performance.
     info!("Transactions rate: {} tx/s", rate);
 
-    let client = Client {
+    let chain_id = ChainId::test();
+    let transfer_amount = 1u64;
+
+    let recipient = LocalAccount::generate(2).context("failed to create recipient account")?;
+    let mut sample_sender = LocalAccount::generate(1).context("failed to create sample sender")?;
+    let sample_tx = apt_transfer(
+        &mut sample_sender,
+        recipient.address,
+        transfer_amount,
+        chain_id,
+    )
+    .context("failed to build sample transaction")?;
+    let tx_size_bytes = bcs::to_bytes(&sample_tx)
+        .context("failed to serialize sample transaction")?
+        .len();
+
+    info!(
+        "Aptos transfer transaction size: {} B (serialized)",
+        tx_size_bytes
+    );
+
+    let sender = LocalAccount::generate(1).context("failed to create sender account")?;
+
+    let mut client = Client {
         target,
-        size,
         rate,
         nodes,
         burst_duration,
+        sender,
+        recipient,
+        chain_id,
+        transfer_amount,
+        tx_size_bytes,
     };
 
     // Wait for all nodes to be online and synchronized.
@@ -83,23 +111,24 @@ async fn main() -> Result<()> {
 
 struct Client {
     target: SocketAddr,
-    size: usize,
     rate: u64,
     nodes: Vec<SocketAddr>,
     burst_duration: u64,
+    sender: LocalAccount,
+    recipient: LocalAccount,
+    chain_id: ChainId,
+    transfer_amount: u64,
+    tx_size_bytes: usize,
 }
 
 impl Client {
-    pub async fn send(&self) -> Result<()> {
+    pub async fn send(&mut self) -> Result<()> {
         const PRECISION: u64 = 20; // Sample precision.
-                                   // const BURST_DURATION: u64 = 1000 / PRECISION;
-                                   // let BURST_DURATION: u64 = self.burst_duration;
         info!("Burst duration {:?}", self.burst_duration);
-        // The transaction size must be at least 16 bytes to ensure all txs are different.
-        if self.size < 9 {
-            return Err(anyhow::Error::msg(
-                "Transaction size must be at least 9 bytes",
-            ));
+
+        if self.rate == 0 {
+            warn!("Transaction rate is zero; no transactions will be sent");
+            return Ok(());
         }
 
         // Connect to the mempool.
@@ -108,47 +137,49 @@ impl Client {
             .context(format!("failed to connect to {}", self.target))?;
 
         // Submit all transactions.
-        let burst = self.rate / PRECISION;
-        let mut tx = BytesMut::with_capacity(self.size);
-        let mut counter = 0;
-        let mut r = rand::thread_rng().gen();
+        let burst = max(1, self.rate / PRECISION);
+        let mut counter: u64 = 0;
         let mut transport = Framed::new(stream, LengthDelimitedCodec::new());
         let interval = interval(Duration::from_millis(self.burst_duration));
         tokio::pin!(interval);
 
-        // NOTE: This log entry is used to compute performance.
-        info!("Start sending transactions");
+        info!(
+            "Start sending transactions (serialized size: {} B)",
+            self.tx_size_bytes
+        );
 
         'main: loop {
             interval.as_mut().tick().await;
-            let now = Instant::now();
+            let start = Instant::now();
 
-            for x in 0..burst {
-                if x == counter % burst {
-                    // NOTE: This log entry is used to compute performance.
-                    info!("Sending sample transaction {}", counter);
+            for i in 0..burst {
+                let sequence = self.sender.sequence_number;
+                if i == counter % burst {
+                    info!(
+                        "Sending sample transaction {} (sequence {})",
+                        counter, sequence
+                    );
+                }
 
-                    tx.put_u8(0u8); // Sample txs start with 0.
-                    tx.put_u64(counter); // This counter identifies the tx.
-                } else {
-                    r += 1;
-                    tx.put_u8(1u8); // Standard txs start with 1.
-                    tx.put_u64(r); // Ensures all clients send different txs.
-                };
-
-                tx.resize(self.size, 0u8);
-                let bytes = tx.split().freeze();
-                if let Err(e) = transport.send(bytes).await {
+                let txn = apt_transfer(
+                    &mut self.sender,
+                    self.recipient.address,
+                    self.transfer_amount,
+                    self.chain_id,
+                )?;
+                let bytes = bcs::to_bytes(&txn)?;
+                if let Err(e) = transport.send(Bytes::from(bytes)).await {
                     warn!("Failed to send transaction: {}", e);
                     break 'main;
                 }
+                counter = counter.wrapping_add(1);
             }
-            if now.elapsed().as_millis() > self.burst_duration as u128 {
-                // NOTE: This log entry is used to compute performance.
+
+            if start.elapsed().as_millis() > self.burst_duration as u128 {
                 warn!("Transaction rate too high for this client");
             }
-            counter += 1;
         }
+
         Ok(())
     }
 

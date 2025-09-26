@@ -25,6 +25,9 @@ crypto = { path = "../crypto" }
 network = { path = "../network" }
 config = { path = "../config" }
 primary = { path = "../primary" }
+aptos_executor = { path = "../aptos_executor" }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
 
 [dev-dependencies]
 tokio-util = { version = "0.6.2", features= ["codec"] }
