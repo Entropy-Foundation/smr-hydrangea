@@ -2,6 +2,7 @@ use aptos_executor::{AptosVmExecutor, LocalAccount, TransactionResult};
 use aptos_types::transaction::SignedTransaction;
 use log::{error, info, warn};
 use primary::{Certificate, Header};
+use std::collections::HashSet;
 use store::Store;
 use tokio::sync::mpsc::Receiver;
 
@@ -54,6 +55,11 @@ impl Committer {
                 }
             }
 
+            if transactions.is_empty() {
+                continue;
+            }
+
+            let transactions = deduplicate_transactions(transactions);
             if transactions.is_empty() {
                 continue;
             }
@@ -122,4 +128,28 @@ fn log_execution_results(transactions: &[SignedTransaction], results: &[Transact
 
 fn serialized_len(tx: &SignedTransaction) -> usize {
     bcs::serialized_size(tx).expect("failed to compute serialized transaction size") as usize
+}
+
+fn deduplicate_transactions(transactions: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
+    let mut seen: HashSet<Vec<u8>> = HashSet::with_capacity(transactions.len());
+    let mut unique = Vec::with_capacity(transactions.len());
+
+    for txn in transactions {
+        match bcs::to_bytes(&txn) {
+            Ok(bytes) => {
+                if seen.insert(bytes) {
+                    unique.push(txn);
+                }
+            }
+            Err(error) => {
+                warn!(
+                    "Failed to serialize transaction for deduplication: {}",
+                    error
+                );
+                unique.push(txn);
+            }
+        }
+    }
+
+    unique
 }

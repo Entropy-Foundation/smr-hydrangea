@@ -1,4 +1,5 @@
 use aptos_types::transaction::SignedTransaction;
+use log::debug;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::time::{sleep, Duration, Instant};
@@ -53,6 +54,11 @@ impl BatchMaker {
                 Some(transaction) = self.rx_transaction.recv() => {
                     self.current_batch_size += serialized_len(&transaction);
                     self.current_batch.push(transaction);
+                    debug!(
+                        "Worker collected transaction; batch_size={} bytes, count={}",
+                        self.current_batch_size,
+                        self.current_batch.len()
+                    );
                     if self.current_batch_size >= self.batch_size {
                         self.seal().await;
                         timer.as_mut().reset(Instant::now() + Duration::from_millis(self.max_batch_delay));
@@ -77,6 +83,12 @@ impl BatchMaker {
     async fn seal(&mut self) {
         let batch: Vec<Transaction> = self.current_batch.drain(..).collect();
         self.current_batch_size = 0;
+        if !batch.is_empty() {
+            debug!(
+                "Worker sealing batch containing {} transactions",
+                batch.len()
+            );
+        }
         self.tx_digests
             .send(batch)
             .await

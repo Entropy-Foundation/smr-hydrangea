@@ -10,7 +10,8 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_config::{
         primary_apt_store, AccountResource, AggregatorResource, CoinStoreResource,
-        ConcurrentSupplyResource, FungibleStoreResource, ObjectGroupResource,
+        ConcurrentSupplyResource, FungibleStoreResource, MigrationFlag, ObjectCoreResource,
+        ObjectGroupResource,
     },
     event::{EventHandle, EventKey},
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -250,11 +251,25 @@ impl AptosDatabase {
     ) {
         let primary_store_address = primary_apt_store(account_address);
         let mut object_group = ObjectGroupResource::default();
+
+        let transfer_events = EventHandle::new(EventKey::new(0, primary_store_address), 0);
+        let object_core = ObjectCoreResource::new(account_address, false, transfer_events);
+        object_group.insert(
+            ObjectCoreResource::struct_tag(),
+            bcs::to_bytes(&object_core).expect("object core BCS"),
+        );
+
         let store = FungibleStoreResource::new(AccountAddress::TEN, balance, false);
         object_group.insert(
             FungibleStoreResource::struct_tag(),
             bcs::to_bytes(&store).expect("fungible store BCS"),
         );
+
+        object_group.insert(
+            MigrationFlag::struct_tag(),
+            bcs::to_bytes(&MigrationFlag::default()).expect("migration flag BCS"),
+        );
+
         let group_bytes = object_group
             .to_bytes()
             .expect("fungible store object group serialization");

@@ -20,9 +20,9 @@ impl LeaderElector {
             LeaderElectorKind::Simple => {
                 LeaderElectorInner::Simple(SimpleLeaderElector::new(committee))
             }
-            LeaderElectorKind::FairSuccession => LeaderElectorInner::Fair(
-                DeterministicFairSuccessionLeaderElector::new(committee),
-            ),
+            LeaderElectorKind::FairSuccession => {
+                LeaderElectorInner::Fair(DeterministicFairSuccessionLeaderElector::new(committee))
+            }
             LeaderElectorKind::FailureBestCase => LeaderElectorInner::Failure(
                 FailureSimulationLeaderElector::new(committee, FailureScenario::BEST),
             ),
