@@ -13,12 +13,9 @@ module simple_market::market_setup {
     use aptos_std::type_info;
     use aptos_std::type_info::TypeInfo;
 
+    use aptos_experimental::market;
     use aptos_experimental::market_types;
-    use aptos_experimental::market_types::Market;
-    use aptos_experimental::order_book_types;
-    use aptos_experimental::order_book_types::{OrderIdType, TimeInForce, TriggerCondition};
-    use aptos_experimental::order_placement;
-    use aptos_experimental::order_operations;
+    use aptos_experimental::order_book_types::{OrderIdType, TriggerCondition};
     use simple_market::vault;
     use simple_market::coins::{BaseCoin, QuoteCoin};
 
@@ -28,12 +25,14 @@ module simple_market::market_setup {
     const EPRICE_OVERFLOW: u64 = 5;
     const EORDER_NOT_FOUND: u64 = 6;
 
-    struct OrderMetadata has store, copy, drop {}
+    struct OrderMetadata has store, copy, drop {
+        market: address,
+    }
 
     struct MarketStore has key {
         base: TypeInfo,
         quote: TypeInfo,
-        market: market_types::Market<OrderMetadata>,
+        market: market::Market<OrderMetadata>,
     }
 
     fun ensure_coin_initialized<CoinType: copy + drop + store>(
@@ -89,12 +88,12 @@ module simple_market::market_setup {
         ensure_registered<BaseCoin>(market_signer);
         ensure_registered<QuoteCoin>(market_signer);
 
-        let config = market_types::new_market_config(
+        let config = market::new_market_config(
             allow_self_matching,
             allow_events_emission,
             pre_cancellation_window_secs,
         );
-        let new_market = market_types::new_market<OrderMetadata>(admin, market_signer, config);
+        let new_market = market::new_market<OrderMetadata>(admin, market_signer, config);
 
         let market_address = signer::address_of(market_signer);
         assert!(!exists<MarketStore>(market_address), ECONFLICTING_MARKET);
@@ -162,9 +161,9 @@ module simple_market::market_setup {
         assert!(exists<MarketStore>(market_address), EMARKET_NOT_FOUND);
         let market_store = borrow_global_mut<MarketStore>(market_address);
         let callbacks = new_demo_callbacks();
-        order_operations::cancel_order_with_client_id(
+        market::cancel_order_with_client_id(
             &mut market_store.market,
-            signer::address_of(trader),
+            trader,
             client_order_id,
             &callbacks,
         );
@@ -188,9 +187,9 @@ module simple_market::market_setup {
         assert!(option::is_some(&order_id_option), EORDER_NOT_FOUND);
         let order_id = option::destroy_some(order_id_option);
         let callbacks = new_demo_callbacks();
-        order_operations::decrease_order_size(
+        market::decrease_order_size(
             market,
-            trader_addr,
+            trader,
             order_id,
             size_delta,
             &callbacks,
@@ -208,11 +207,10 @@ module simple_market::market_setup {
         let market_address = signer::address_of(market_signer);
         assert!(exists<MarketStore>(market_address), EMARKET_NOT_FOUND);
         let market_store = borrow_global_mut<MarketStore>(market_address);
-        let trader_addr = signer::address_of(trader);
         let callbacks = new_demo_callbacks();
-        order_operations::cancel_order_with_client_id(
+        market::cancel_order_with_client_id(
             &mut market_store.market,
-            trader_addr,
+            trader,
             client_order_id,
             &callbacks,
         );
@@ -242,10 +240,11 @@ module simple_market::market_setup {
         ensure_registered<QuoteCoin>(trader);
 
         reserve_order_funds(market_address, trader, limit_price, size, is_bid);
-        let time_in_force = order_book_types::good_till_cancelled();
+        let time_in_force = market_types::good_till_cancelled();
         let callbacks = new_demo_callbacks();
+        let metadata = OrderMetadata { market: market_address };
 
-        let _ = order_placement::place_limit_order<OrderMetadata, OrderMetadata>(
+        let _ = market::place_limit_order<OrderMetadata>(
             &mut market_store.market,
             trader,
             limit_price,
@@ -253,7 +252,7 @@ module simple_market::market_setup {
             is_bid,
             time_in_force,
             option::none<TriggerCondition>(),
-            OrderMetadata {},
+            metadata,
             client_order_id,
             10,
             false,
@@ -261,21 +260,18 @@ module simple_market::market_setup {
         );
     }
 
-    fun new_demo_callbacks(): market_types::MarketClearinghouseCallbacks<OrderMetadata, OrderMetadata> {
-        market_types::new_market_clearinghouse_callbacks<OrderMetadata, OrderMetadata>(
+    fun new_demo_callbacks(): market_types::MarketClearinghouseCallbacks<OrderMetadata> {
+        market_types::new_market_clearinghouse_callbacks<OrderMetadata>(
             settle_trade_callback,
             validate_order_callback,
-            validate_bulk_order_callback,
             place_maker_order_callback,
             cleanup_order_callback,
-            cleanup_bulk_orders_callback,
             decrease_order_size_callback,
             metadata_bytes_callback,
         )
     }
 
     fun settle_trade_callback(
-        market: &mut Market<OrderMetadata>,
         taker: address,
         _taker_order_id: OrderIdType,
         maker: address,
@@ -284,19 +280,18 @@ module simple_market::market_setup {
         is_taker_long: bool,
         price: u64,
         size: u64,
-        _taker_metadata: OrderMetadata,
+        taker_metadata: OrderMetadata,
         _maker_metadata: OrderMetadata,
-    ): market_types::SettleTradeResult<OrderMetadata> {
+    ): market_types::SettleTradeResult {
         if (size == 0) {
             return market_types::new_settle_trade_result(
                 0,
                 option::none<string::String>(),
                 option::none<string::String>(),
-                market_types::new_callback_result_not_available<OrderMetadata>(),
             );
         };
 
-        let market_addr = market_types::get_market_address(market);
+        let market_addr = taker_metadata.market;
         let quote_amount = compute_quote_amount(price, size);
 
         if (is_taker_long) {
@@ -319,7 +314,6 @@ module simple_market::market_setup {
             size,
             option::none<string::String>(),
             option::none<string::String>(),
-            market_types::new_callback_result_not_available<OrderMetadata>(),
         )
     }
 
@@ -328,20 +322,8 @@ module simple_market::market_setup {
         _order_id: OrderIdType,
         _is_taker: bool,
         _is_bid: bool,
-        _price: u64,
-        _time_in_force: TimeInForce,
+        _price: option::Option<u64>,
         _size: u64,
-        _metadata: OrderMetadata,
-    ): bool {
-        true
-    }
-
-    fun validate_bulk_order_callback(
-        _account: address,
-        _bid_prices: vector<u64>,
-        _bid_sizes: vector<u64>,
-        _ask_prices: vector<u64>,
-        _ask_sizes: vector<u64>,
         _metadata: OrderMetadata,
     ): bool {
         true
@@ -359,13 +341,6 @@ module simple_market::market_setup {
     fun cleanup_order_callback(
         _account: address,
         _order_id: OrderIdType,
-        _is_bid: bool,
-        _remaining_size: u64,
-        _metadata: OrderMetadata,
-    ) {}
-
-    fun cleanup_bulk_orders_callback(
-        _account: address,
         _is_bid: bool,
         _remaining_size: u64,
     ) {}
